@@ -1,0 +1,83 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+[*.{json,xml,xaml,csproj,props,targets,config,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ---------------------------------------------------------------------------
+# Convenciones de código C#
+# ---------------------------------------------------------------------------
+[*.cs]
+
+# using de System primero, luego el resto en orden alfabético
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# this. no aporta nada con Nullable + IDE ya resolviendo el símbolo
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# var solo cuando el tipo es obvio por el lado derecho
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Miembros con expresión de una sola línea: sí en propiedades/lambdas, no en métodos largos
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+
+# Llaves siempre, ni un "if" de una línea sin ellas: legibilidad sobre brevedad
+csharp_prefer_braces = true:warning
+
+# required en vez de constructores repetitivos para tipos con muchas propiedades init
+dotnet_style_prefer_auto_properties = true:suggestion
+
+# Miembros privados con _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
+dotnet_naming_style.underscore_prefix.required_prefix = _
+
+# ---------------------------------------------------------------------------
+# Severidad de analizadores (AnalysisLevel latest-recommended)
+# ---------------------------------------------------------------------------
+
+# CA1707 prohíbe guiones bajos en nombres de miembro. En los proyectos de prueba se
+# desactiva más abajo porque Metodo_Escenario_Resultado es la convención de nombres
+# de xUnit usada en todo el proyecto (ver CLAUDE.md §7).
+dotnet_diagnostic.CA1707.severity = warning
+
+# CA1062: validar argumentos públicos no nulos. Con Nullable habilitado y warnings
+# como errores, el compilador ya fuerza esto en el 99% de los casos; se deja en
+# sugerencia para no duplicar la protección en cada método.
+dotnet_diagnostic.CA1062.severity = suggestion
+
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+# ---------------------------------------------------------------------------
+# Código generado: migraciones de EF Core, WPF, etc.
+# ---------------------------------------------------------------------------
+[**/Migrations/*.cs]
+generated_code = true
+
+[*.g.cs]
+generated_code = true

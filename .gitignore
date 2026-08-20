@@ -1,0 +1,53 @@
+# =====================================================================
+# .NET
+# =====================================================================
+bin/
+obj/
+out/
+
+# Resultados de dotnet test / dotnet format
+TestResults/
+*.trx
+*.received.*
+
+# Bases de datos SQLite locales generadas en desarrollo
+*.db
+*.db-shm
+*.db-wal
+
+# Publicación
+publish/
+
+# Herramientas de usuario de Visual Studio / Rider
+*.user
+*.suo
+.vs/
+.idea/
+*.userosscache
+*.sln.docstates
+
+# Certificados de desarrollo
+*.pfx
+*.pem
+
+# =====================================================================
+# Node / Vite (web/)
+# =====================================================================
+web/node_modules/
+web/dist/
+web/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# La salida de "vite build" se copia a wwwroot como paso del build de .NET:
+# no versionamos ese resultado compilado.
+src/JMBackup.Api/wwwroot/**
+!src/JMBackup.Api/wwwroot/.gitkeep
+
+# =====================================================================
+# Sistema operativo / editor
+# =====================================================================
+Thumbs.db
+.DS_Store
+*.swp
