@@ -8,4 +8,8 @@
     <ProjectReference Include="..\JMBackup.Application\JMBackup.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="JMBackup.Storage.Tests" />
+  </ItemGroup>
+
 </Project>

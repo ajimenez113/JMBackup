@@ -83,6 +83,59 @@ dotnet test JMBackup.sln
 Los tres deben terminar sin advertencias ni errores antes de dar por cerrada
 cualquier fase (`TreatWarningsAsErrors` está activado en toda la solución).
 
+## Usar el motor desde la línea de comandos
+
+En la fase 1 no hay API ni interfaz: el motor de copia se corre con `JMBackup.Cli`,
+directamente contra disco local o recursos UNC.
+
+```powershell
+dotnet run --project src/JMBackup.Cli -- run --config tarea.json
+dotnet run --project src/JMBackup.Cli -- run --config tarea.json --dry-run
+```
+
+`tarea.json` describe una tarea de respaldo:
+
+```json
+{
+  "name": "Respaldo Documentos",
+  "sourcePaths": ["C:/Datos/Documentos"],
+  "destinationPaths": ["D:/Backups/Documentos"],
+  "mode": "Mirror",
+  "includeSubfolders": true,
+  "orderStrategy": "NameAscending",
+  "exclusions": [
+    { "kind": "Extension", "pattern": "tmp" }
+  ],
+  "filters": [],
+  "verifyHash": false,
+  "removeEmptyDirs": false,
+  "absolutePaths": false,
+  "maxParallelTransfers": 4
+}
+```
+
+Si un origen o destino es un recurso UNC (`\\SERVIDOR\recurso`) que exige credenciales,
+primero hay que cifrarlas con DPAPI — nunca se escribe una contraseña en texto plano en
+`tarea.json`:
+
+```powershell
+dotnet run --project src/JMBackup.Cli -- credential protect --username usuario
+# pide la contraseña por consola (oculta) e imprime el blob cifrado en base64
+```
+
+Ese blob va en un bloque `credentials` dentro de `tarea.json`:
+
+```json
+{
+  "credentials": [
+    { "uncRoot": "\\\\NAS1\\Backups", "username": "NAS1\\usuario", "protectedPassword": "<blob en base64>" }
+  ]
+}
+```
+
+El blob solo se puede descifrar en el mismo equipo donde se generó (DPAPI en ámbito de
+máquina): no sirve copiarlo a otra instalación.
+
 ## Estructura de la solución
 
 ```
@@ -106,6 +159,7 @@ JMBackup/
     ├── JMBackup.Domain.Tests/
     ├── JMBackup.Application.Tests/
     ├── JMBackup.Storage.Tests/
+    ├── JMBackup.Infrastructure.Tests/  # DPAPI y el repositorio de FileIndex (ADR-016)
     └── JMBackup.Api.IntegrationTests/
 ```
 
@@ -125,7 +179,10 @@ lo haría un navegador.
 
 ## Estado actual
 
-**Fase 0 completa**: la solución compila, tiene pruebas de humo en los cuatro
-proyectos de test, persistencia con la tabla `Settings`, logging estructurado y
-jerarquía de excepciones. Todavía no copia archivos ni expone la API — eso empieza en
-la fase 1 (`docs/02-ROADMAP-HITO1.md`).
+**Fase 1 completa**: motor de copia local y UNC funcional desde `JMBackup.Cli` —
+`IStorageBackend` (ADR-006, ADR-014), escáner con exclusiones/filtros/orden (RF-15,
+RF-40 a RF-52), incremental contra `FileIndex`, escritura atómica, modo espejo con
+papelera de seguridad (RF-73), simulación (RF-74), verificación posterior (RF-75),
+reintentos y disyuntor por destino (RF-160, RF-162), estancamiento por bytes (RF-161),
+credenciales SMB cifradas con DPAPI. Todavía sin API, sin servicio de Windows y sin
+interfaz — eso empieza en la fase 2 (`docs/02-ROADMAP-HITO1.md`).

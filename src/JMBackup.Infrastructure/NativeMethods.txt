@@ -1,0 +1,2 @@
+WNetAddConnection2W
+WNetCancelConnection2W

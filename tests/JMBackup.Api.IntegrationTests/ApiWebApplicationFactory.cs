@@ -24,8 +24,8 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<DbContextOptions<JMBackupDbContext>>();
-            services.AddDbContext<JMBackupDbContext>(options => options.UseSqlite(_connection));
+            services.RemoveAll<IDbContextFactory<JMBackupDbContext>>();
+            services.AddDbContextFactory<JMBackupDbContext>(options => options.UseSqlite(_connection));
         });
     }
 

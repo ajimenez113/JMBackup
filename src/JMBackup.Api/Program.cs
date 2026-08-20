@@ -1,5 +1,6 @@
 using JMBackup.Infrastructure.Options;
 using JMBackup.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -37,7 +38,9 @@ var app = builder.Build();
 
 using (var startupScope = app.Services.CreateScope())
 {
-    startupScope.ServiceProvider.GetRequiredService<JMBackupDbContext>().MigrateAndEnableWalMode();
+    var dbContextFactory = startupScope.ServiceProvider.GetRequiredService<IDbContextFactory<JMBackupDbContext>>();
+    await using var startupDbContext = await dbContextFactory.CreateDbContextAsync();
+    startupDbContext.MigrateAndEnableWalMode();
 }
 
 app.Run();
