@@ -3,7 +3,8 @@ using FluentAssertions;
 
 namespace JMBackup.Api.IntegrationTests;
 
-public class SmokeTests(ApiWebApplicationFactory factory) : IClassFixture<ApiWebApplicationFactory>
+[Collection(ApiIntegrationTestGroup.Name)]
+public class SmokeTests(ApiWebApplicationFactory factory)
 {
     [Fact]
     public async Task Host_StartsAndAppliesMigrations()

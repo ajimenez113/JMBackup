@@ -155,6 +155,8 @@ JMBackup/
 │   ├── JMBackup.Desktop/        # shell WPF con WebView2
 │   └── JMBackup.Cli/            # línea de comandos para correr el motor sin la API
 ├── web/                         # interfaz React + Vite + Tailwind (fase 3)
+├── build/                       # instalación del servicio de Windows
+│   └── Install-JMBackupService.ps1
 └── tests/
     ├── JMBackup.Domain.Tests/
     ├── JMBackup.Application.Tests/
@@ -177,6 +179,34 @@ implementan y que se inyectan por contenedor de dependencias. El escritorio nunc
 llama código de `Application` directamente: habla HTTPS/SignalR con `Api`, igual que
 lo haría un navegador.
 
+## Ejecutar la API en desarrollo
+
+```powershell
+dotnet run --project src/JMBackup.Api
+```
+
+Al primer arranque genera un certificado autofirmado en
+`%ProgramData%\JMBackup\jmbackup.pfx` y migra la base. Sin credencial configurada,
+Kestrel escucha solo en `127.0.0.1` (ADR-007): la interfaz web queda accesible en
+`https://127.0.0.1:8483` pero no desde otro equipo de la red hasta configurar usuario y
+contraseña vía `PUT /api/settings/security`. El documento OpenAPI se publica en
+`/openapi/v1.json` (ADR-020).
+
+## Instalar como servicio de Windows
+
+```powershell
+dotnet publish src/JMBackup.Api -c Release -r win-x64 --self-contained `
+  -p:PublishSingleFile=true -o publish
+
+# En una consola elevada (Administrador):
+.\build\Install-JMBackupService.ps1
+```
+
+El script crea una cuenta de servicio local dedicada, le otorga *Iniciar sesión como
+servicio*, registra el servicio de Windows, abre la regla de firewall entrante para el
+puerto configurado, y activa `LongPathsEnabled`. Ver comentarios del propio script para
+los parámetros disponibles.
+
 ## Estado actual
 
 **Fase 1 completa**: motor de copia local y UNC funcional desde `JMBackup.Cli` —
@@ -184,5 +214,15 @@ lo haría un navegador.
 RF-40 a RF-52), incremental contra `FileIndex`, escritura atómica, modo espejo con
 papelera de seguridad (RF-73), simulación (RF-74), verificación posterior (RF-75),
 reintentos y disyuntor por destino (RF-160, RF-162), estancamiento por bytes (RF-161),
-credenciales SMB cifradas con DPAPI. Todavía sin API, sin servicio de Windows y sin
-interfaz — eso empieza en la fase 2 (`docs/02-ROADMAP-HITO1.md`).
+credenciales SMB cifradas con DPAPI.
+
+**Fase 2 completa**: persistencia con EF Core/SQLite de tareas, grupos, rutas,
+exclusiones, filtros, horarios, ejecuciones y bitácora (`docs/01-ARQUITECTURA.md` §4);
+API de ASP.NET Core Minimal con endpoints agrupados por área, validación con
+FluentValidation, progreso en vivo por SignalR (`/hubs/progress`); login con Argon2id,
+cookies `HttpOnly`+`Secure`+`SameSite=Strict`, antiforgery en escrituras, rate limiting
+nativo en el login, normalización y validación de toda ruta recibida contra path
+traversal; servicio de Windows (`UseWindowsService`) con script de instalación en
+`build/`; Quartz.NET planificando las tareas (RF-30 a RF-32) persistido en la misma
+SQLite. Todavía sin interfaz gráfica — eso empieza en la fase 3
+(`docs/02-ROADMAP-HITO1.md`).

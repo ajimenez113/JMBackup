@@ -43,8 +43,9 @@ public sealed record TaskFileConfiguration
 
     public IReadOnlyList<TaskFileCredential> Credentials { get; init; } = [];
 
-    public BackupJobDefinition ToDefinition() => new()
+    public BackupJobDefinition ToDefinition(int taskId) => new()
     {
+        TaskId = taskId,
         Name = Name,
         SourcePaths = SourcePaths,
         DestinationPaths = DestinationPaths,

@@ -33,7 +33,7 @@ public class BackupPlannerTests
         var index = new InMemoryFileIndexStore();
         await index.UpsertAsync(new FileIndexEntry
         {
-            TaskName = "tarea",
+            TaskId = 1,
             RelativePath = "origen/archivo.txt",
             Size = 3,
             ModifiedUtc = modifiedUtc,
@@ -55,7 +55,7 @@ public class BackupPlannerTests
         var index = new InMemoryFileIndexStore();
         await index.UpsertAsync(new FileIndexEntry
         {
-            TaskName = "tarea",
+            TaskId = 1,
             RelativePath = "origen/archivo.txt",
             Size = 3,
             ModifiedUtc = modifiedUtc,
@@ -75,7 +75,7 @@ public class BackupPlannerTests
         var index = new InMemoryFileIndexStore();
         await index.UpsertAsync(new FileIndexEntry
         {
-            TaskName = "tarea",
+            TaskId = 1,
             RelativePath = "origen/eliminado.txt",
             Size = 10,
             ModifiedUtc = TimeProvider.GetUtcNow(),
@@ -84,6 +84,7 @@ public class BackupPlannerTests
 
         var definition = new BackupJobDefinition
         {
+            TaskId = 1,
             Name = "tarea",
             SourcePaths = ["origen"],
             DestinationPaths = ["destino"],
@@ -108,7 +109,7 @@ public class BackupPlannerTests
         var index = new InMemoryFileIndexStore();
         await index.UpsertAsync(new FileIndexEntry
         {
-            TaskName = "tarea",
+            TaskId = 1,
             RelativePath = "origen/ya-no-esta.txt",
             Size = 10,
             ModifiedUtc = TimeProvider.GetUtcNow(),
@@ -124,6 +125,7 @@ public class BackupPlannerTests
     {
         var definition = new BackupJobDefinition
         {
+            TaskId = 1,
             Name = "tarea",
             SourcePaths = ["origen"],
             DestinationPaths = ["destino"],

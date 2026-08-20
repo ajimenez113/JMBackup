@@ -3,6 +3,7 @@ using System.Text.Json;
 using JMBackup.Application.Abstractions;
 using JMBackup.Application.Backup;
 using JMBackup.Application.Scanning;
+using JMBackup.Domain.Entities;
 using JMBackup.Domain.Exceptions;
 using JMBackup.Infrastructure.Options;
 using JMBackup.Infrastructure.Persistence;
@@ -42,6 +43,8 @@ internal static class RunCommand
             migrationContext.MigrateAndEnableWalMode();
         }
 
+        var taskId = await FindOrCreateTaskIdAsync(dbContextFactory, configuration.Name, timeProvider, cancellationToken).ConfigureAwait(false);
+
         var fileIndexStore = new EfFileIndexStore(dbContextFactory);
         var scanner = new FileScanner(timeProvider);
         using var pauseController = new PauseController();
@@ -61,7 +64,7 @@ internal static class RunCommand
                 connectedUncRoots.Add(credential.UncRoot);
             }
 
-            var definition = configuration.ToDefinition();
+            var definition = configuration.ToDefinition(taskId);
 
             foreach (var path in definition.SourcePaths)
             {
@@ -95,6 +98,29 @@ internal static class RunCommand
                 WNetShareConnector.Disconnect(uncRoot);
             }
         }
+    }
+
+    /// <summary>
+    /// <c>FileIndex</c> se identifica por <c>TaskId</c> (fase 2), no por nombre; como el
+    /// Cli corre tareas sueltas de <c>tarea.json</c> sin pasar por la API, busca o crea
+    /// la fila de <c>TaskDefinition</c> correspondiente en la misma base para obtener
+    /// un identificador estable entre corridas.
+    /// </summary>
+    private static async Task<int> FindOrCreateTaskIdAsync(
+        IDbContextFactory<JMBackupDbContext> dbContextFactory, string taskName, TimeProvider timeProvider, CancellationToken cancellationToken)
+    {
+        var repository = new EfTaskRepository(dbContextFactory);
+        var existing = (await repository.ListAsync(cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(task => task.Name == taskName);
+
+        if (existing is not null)
+        {
+            return existing.Id;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var created = new TaskDefinition { Name = taskName, CreatedAt = now, UpdatedAt = now };
+        return await repository.CreateAsync(created, cancellationToken).ConfigureAwait(false);
     }
 
     private static void ReportProgress(BackupProgress progress) =>

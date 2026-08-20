@@ -238,7 +238,9 @@ En `Directory.Build.props`, para **todos** los proyectos:
   se sustituyen con NSubstitute. Si una clase no se puede probar sin disco, está mal
   ubicada.
 - `Storage` se prueba con carpetas temporales reales.
-- `JMBackup.Api.IntegrationTests` usa `WebApplicationFactory` con SQLite en memoria.
+- `JMBackup.Api.IntegrationTests` usa `WebApplicationFactory` con SQLite en un
+  archivo temporal por ejecución (ver ADR-022; el arranque en dos tiempos de
+  `Program.cs`, necesario por ADR-007, impide usar `:memory:`).
 - Pruebas del motor sobre árboles de archivos generados, nunca sobre datos reales.
 
 ## 8. Reglas de trabajo para Claude Code

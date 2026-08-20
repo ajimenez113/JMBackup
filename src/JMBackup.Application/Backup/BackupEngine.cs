@@ -108,7 +108,7 @@ public sealed class BackupEngine(
 
         foreach (var item in combinedPlan.ToTrash)
         {
-            await MoveToTrashAsync(item, destinationBackends[item.DestinationRoot], definition.Name, cancellationToken).ConfigureAwait(false);
+            await MoveToTrashAsync(item, destinationBackends[item.DestinationRoot], definition.TaskId, cancellationToken).ConfigureAwait(false);
             filesTrashed++;
         }
 
@@ -239,7 +239,7 @@ public sealed class BackupEngine(
             }, fileCancellation.Token).ConfigureAwait(false);
 
             await VerifyAsync(item, sourceBackend, destinationBackend, definition.VerifyHash, cancellationToken).ConfigureAwait(false);
-            await UpdateFileIndexAsync(item, definition.Name, cancellationToken).ConfigureAwait(false);
+            await UpdateFileIndexAsync(item, definition.TaskId, cancellationToken).ConfigureAwait(false);
             return (null, true);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -293,7 +293,7 @@ public sealed class BackupEngine(
         }
     }
 
-    private Task UpdateFileIndexAsync(PlannedItem item, string taskName, CancellationToken cancellationToken)
+    private Task UpdateFileIndexAsync(PlannedItem item, int taskId, CancellationToken cancellationToken)
     {
         // Se indexan el tamaño y la fecha del ORIGEN (ya confirmados iguales en el
         // destino por VerifyAsync), no los del destino: la próxima detección
@@ -301,7 +301,7 @@ public sealed class BackupEngine(
         // el destino no tiene relación con la fecha de modificación real del archivo.
         return fileIndexStore.UpsertAsync(new FileIndexEntry
         {
-            TaskName = taskName,
+            TaskId = taskId,
             RelativePath = item.RelativePath,
             Size = item.Size,
             ModifiedUtc = item.ModifiedUtc,
@@ -309,7 +309,7 @@ public sealed class BackupEngine(
         }, cancellationToken);
     }
 
-    private async Task MoveToTrashAsync(PlannedItem item, IStorageBackend destinationBackend, string taskName, CancellationToken cancellationToken)
+    private async Task MoveToTrashAsync(PlannedItem item, IStorageBackend destinationBackend, int taskId, CancellationToken cancellationToken)
     {
         var dateFolder = timeProvider.GetUtcNow().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var trashPath = $"_JMBackup_Papelera/{dateFolder}/{item.RelativePath}";
@@ -321,7 +321,7 @@ public sealed class BackupEngine(
         }
 
         await destinationBackend.MoveAsync(item.RelativePath, trashPath, cancellationToken).ConfigureAwait(false);
-        await fileIndexStore.RemoveAsync(taskName, item.RelativePath, cancellationToken).ConfigureAwait(false);
+        await fileIndexStore.RemoveAsync(taskId, item.RelativePath, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task RemoveEmptyDirectoriesAsync(IStorageBackend destinationBackend, CancellationToken cancellationToken)

@@ -244,6 +244,7 @@ public class BackupEngineTests
 
     private static BackupJobDefinition SingleFileDefinition(BackupMode mode = BackupMode.Incremental) => new()
     {
+        TaskId = 1,
         Name = "tarea",
         SourcePaths = ["origen"],
         DestinationPaths = ["destino"],

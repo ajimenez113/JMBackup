@@ -35,7 +35,7 @@ public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndex
                 seenRelativePaths.Add(destinationRelativePath);
 
                 var indexEntry = await fileIndexStore
-                    .FindAsync(definition.Name, destinationRelativePath, cancellationToken)
+                    .FindAsync(definition.TaskId, destinationRelativePath, cancellationToken)
                     .ConfigureAwait(false);
 
                 var isUpToDate = indexEntry is not null
@@ -57,7 +57,7 @@ public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndex
 
         if (definition.Mode == BackupMode.Mirror)
         {
-            await foreach (var indexed in fileIndexStore.GetAllForTaskAsync(definition.Name, cancellationToken).ConfigureAwait(false))
+            await foreach (var indexed in fileIndexStore.GetAllForTaskAsync(definition.TaskId, cancellationToken).ConfigureAwait(false))
             {
                 if (seenRelativePaths.Contains(indexed.RelativePath))
                 {

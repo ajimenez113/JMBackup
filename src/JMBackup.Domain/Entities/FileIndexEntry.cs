@@ -2,14 +2,13 @@ namespace JMBackup.Domain.Entities;
 
 /// <summary>
 /// Caché de detección incremental: el último estado conocido de un archivo respaldado
-/// por una tarea (RF-164). Se identifica por (<see cref="TaskName"/>,
-/// <see cref="RelativePath"/>) porque en el hito 1 todavía no existe la tabla
-/// <c>Tasks</c> con un identificador propio; cuando exista (fase 2), esta clave se
-/// migra a la FK real sin perder los datos ya cacheados.
+/// por una tarea (RF-164). Se identifica por (<see cref="TaskId"/>,
+/// <see cref="RelativePath"/>) — FK real a <see cref="TaskDefinition"/> desde la fase 2;
+/// en la fase 1, sin esa tabla todavía, se identificaba por el nombre de la tarea.
 /// </summary>
 public sealed class FileIndexEntry
 {
-    public required string TaskName { get; init; }
+    public required int TaskId { get; init; }
 
     public required string RelativePath { get; init; }
 

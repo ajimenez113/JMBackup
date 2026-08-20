@@ -9,10 +9,13 @@ public sealed class FileIndexEntryConfiguration : IEntityTypeConfiguration<FileI
     public void Configure(EntityTypeBuilder<FileIndexEntry> builder)
     {
         builder.ToTable("FileIndex");
-        builder.HasKey(entry => new { entry.TaskName, entry.RelativePath });
-        builder.Property(entry => entry.TaskName).HasMaxLength(200);
+        builder.HasKey(entry => new { entry.TaskId, entry.RelativePath });
         builder.Property(entry => entry.RelativePath).HasMaxLength(1024);
         builder.Property(entry => entry.Sha256).HasMaxLength(64);
-        builder.HasIndex(entry => entry.TaskName);
+
+        builder.HasOne<TaskDefinition>()
+            .WithMany()
+            .HasForeignKey(entry => entry.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
