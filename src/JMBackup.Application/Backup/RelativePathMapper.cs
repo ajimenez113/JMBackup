@@ -13,13 +13,21 @@ public static class RelativePathMapper
         ArgumentNullException.ThrowIfNull(sourceRoot);
         ArgumentNullException.ThrowIfNull(relativeToRoot);
 
+        // Las rutas de origen que llegan acá son las que el usuario tipeó en el
+        // asistente (p. ej. "C:\Users\...\Google"), con "\" nativo de Windows — no
+        // están normalizadas a "/" como sí lo exige IStorageBackend para las rutas
+        // relativas internas. Sin este reemplazo, GetLeafName no encuentra ningún "/"
+        // y devuelve la ruta absoluta entera como "nombre de hoja", rompiendo la ruta
+        // de destino de cada archivo (bug real: ver conversación del 2026-08-21).
+        var normalizedSourceRoot = sourceRoot.Replace('\\', '/');
+
         if (!absolutePaths)
         {
-            var leafName = GetLeafName(sourceRoot);
+            var leafName = GetLeafName(normalizedSourceRoot);
             return Combine(leafName, relativeToRoot);
         }
 
-        var fullSourcePath = Combine(sourceRoot, relativeToRoot);
+        var fullSourcePath = Combine(normalizedSourceRoot, relativeToRoot);
         return Sanitize(fullSourcePath);
     }
 

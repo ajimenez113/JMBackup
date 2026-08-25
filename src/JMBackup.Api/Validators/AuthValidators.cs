@@ -33,3 +33,31 @@ public sealed class SecuritySettingsRequestValidator : AbstractValidator<Securit
             .WithMessage($"Para exponer sin credencial hay que escribir \"{RiskConfirmationPhrase}\".");
     }
 }
+
+public sealed class WebSettingsRequestValidator : AbstractValidator<WebSettingsRequest>
+{
+    public WebSettingsRequestValidator()
+    {
+        RuleFor(request => request.Port).InclusiveBetween(1, 65535);
+        RuleFor(request => request.ListenAddress).NotEmpty();
+    }
+}
+
+public sealed class GeneralSettingsRequestValidator : AbstractValidator<GeneralSettingsRequest>
+{
+    public GeneralSettingsRequestValidator()
+    {
+        RuleFor(request => request.HistoryRetentionDays).GreaterThanOrEqualTo(1);
+    }
+}
+
+public sealed class TransferSettingsRequestValidator : AbstractValidator<TransferSettingsRequest>
+{
+    public TransferSettingsRequestValidator()
+    {
+        RuleFor(request => request.MaxParallelTransfers).InclusiveBetween(1, 16);
+        RuleFor(request => request.BlockSizeBytes).GreaterThan(0);
+        RuleFor(request => request.GlobalBandwidthLimitBytesPerSecond).GreaterThan(0)
+            .When(request => request.GlobalBandwidthLimitBytesPerSecond is not null);
+    }
+}

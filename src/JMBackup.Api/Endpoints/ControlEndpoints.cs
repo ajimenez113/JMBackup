@@ -1,3 +1,4 @@
+using JMBackup.Api.Contracts;
 using JMBackup.Application.Abstractions;
 using JMBackup.Application.Execution;
 
@@ -12,10 +13,12 @@ public static class ControlEndpoints
 
         group.MapPost("/run-all", RunAllAsync);
         group.MapPost("/{id:int}/run", (int id, IServiceScopeFactory scopeFactory) => RunInBackground(id, dryRun: false, scopeFactory));
-        group.MapPost("/{id:int}/dry-run", DryRunAsync);
+        group.MapPost("/{id:int}/dry-run", DryRunAsync).Produces<DryRunResponse>().Produces(StatusCodes.Status404NotFound);
         group.MapPost("/{id:int}/pause", Pause);
         group.MapPost("/{id:int}/resume", Resume);
         group.MapPost("/{id:int}/cancel", Cancel);
+        group.MapPost("/pause-all", PauseAll);
+        group.MapPost("/cancel-all", CancelAll);
     }
 
     private static async Task<IResult> RunAllAsync(ITaskRepository taskRepository, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
@@ -44,8 +47,8 @@ public static class ControlEndpoints
     /// <summary>El dry run sí se espera: es rápido (no escribe nada) y el resultado se quiere mostrar de inmediato (RF-74).</summary>
     private static async Task<IResult> DryRunAsync(int id, TaskExecutionCoordinator coordinator, CancellationToken cancellationToken)
     {
-        await coordinator.RunTaskAsync(id, dryRun: true, cancellationToken).ConfigureAwait(false);
-        return Results.Ok();
+        var result = await coordinator.RunTaskAsync(id, dryRun: true, cancellationToken).ConfigureAwait(false);
+        return result is null ? Results.NotFound() : Results.Ok(result.ToDryRunResponse());
     }
 
     private static IResult Pause(int id, ActiveRunRegistry registry)
@@ -78,6 +81,32 @@ public static class ControlEndpoints
         }
 
         run.CancellationTokenSource.Cancel();
+        return Results.Ok();
+    }
+
+    private static IResult PauseAll(ActiveRunRegistry registry)
+    {
+        foreach (var taskId in registry.ActiveTaskIds)
+        {
+            if (registry.TryGet(taskId, out var run) && run is not null)
+            {
+                run.PauseController.Pause();
+            }
+        }
+
+        return Results.Ok();
+    }
+
+    private static IResult CancelAll(ActiveRunRegistry registry)
+    {
+        foreach (var taskId in registry.ActiveTaskIds)
+        {
+            if (registry.TryGet(taskId, out var run) && run is not null)
+            {
+                run.CancellationTokenSource.Cancel();
+            }
+        }
+
         return Results.Ok();
     }
 }

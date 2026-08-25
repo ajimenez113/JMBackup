@@ -83,6 +83,7 @@ public sealed class BackupEngine(
 
         var pending = combinedPlan.ToCopy.ToList();
         var totalToCopy = pending.Count;
+        var totalBytesToCopy = combinedPlan.TotalBytesToCopy;
         var circuitBreakers = destinationBackends.Keys.ToDictionary(root => root, _ => TransferResiliencePipelineFactory.CreateCircuitBreaker(timeProvider));
 
         for (var pass = 0; pending.Count > 0 && pass <= TransferResiliencePipelineFactory.MaxRetryPasses; pass++)
@@ -95,7 +96,8 @@ public sealed class BackupEngine(
 
             errors.Clear();
             var passResult = await ExecutePassAsync(
-                pending, sourceBackends, destinationBackends, definition, circuitBreakers, progress, totalToCopy, cancellationToken)
+                pending, sourceBackends, destinationBackends, definition, circuitBreakers, progress,
+                totalToCopy, totalBytesToCopy, filesCopied, bytesCopied, cancellationToken)
                 .ConfigureAwait(false);
 
             // Se acumulan entre pasadas: cada pasada de reintento solo procesa lo que
@@ -137,6 +139,9 @@ public sealed class BackupEngine(
         Dictionary<string, ResiliencePipeline> circuitBreakers,
         IProgress<BackupProgress>? progress,
         int totalFilesInPlan,
+        long totalBytesInPlan,
+        int filesCopiedBeforeThisPass,
+        long bytesCopiedBeforeThisPass,
         CancellationToken cancellationToken)
     {
         var channel = Channel.CreateBounded<PlannedItem>(new BoundedChannelOptions(Math.Max(definition.MaxParallelTransfers * 4, 1))
@@ -151,6 +156,24 @@ public sealed class BackupEngine(
         var filesCopied = 0;
         var bytesCopied = 0L;
         var filesCompleted = 0;
+        var filesFailed = 0;
+
+        // El progreso en vivo (RF-03) se compone con los totales acumulados de pasadas
+        // de reintento anteriores más lo que lleva esta pasada, para que no retroceda
+        // cuando una tarea necesita más de un intento.
+        void ReportLiveProgress(string? currentPath, double bytesPerSecond, TimeSpan? estimatedTimeRemaining)
+        {
+            progress?.Report(new BackupProgress(
+                currentPath,
+                filesCompleted,
+                totalFilesInPlan,
+                bytesCopiedBeforeThisPass + bytesCopied,
+                totalBytesInPlan,
+                filesCopiedBeforeThisPass + filesCopied,
+                filesFailed,
+                bytesPerSecond,
+                estimatedTimeRemaining));
+        }
 
         var producer = Task.Run(async () =>
         {
@@ -175,6 +198,7 @@ public sealed class BackupEngine(
                     destinationBackends[item.DestinationRoot],
                     definition,
                     circuitBreakers[item.DestinationRoot],
+                    fileTick => { lock (stateLock) { ReportLiveProgress(fileTick.Path, fileTick.BytesPerSecond, fileTick.EstimatedTimeRemaining); } },
                     cancellationToken)
                     .ConfigureAwait(false);
 
@@ -185,6 +209,7 @@ public sealed class BackupEngine(
                     {
                         errors.Add(error);
                         failedItems.Add(item);
+                        filesFailed++;
                     }
                     else
                     {
@@ -192,7 +217,7 @@ public sealed class BackupEngine(
                         bytesCopied += item.Size;
                     }
 
-                    progress?.Report(new BackupProgress(item.RelativePath, filesCompleted, totalFilesInPlan, bytesCopied, bytesCopied));
+                    ReportLiveProgress(item.RelativePath, bytesPerSecond: 0, estimatedTimeRemaining: null);
                 }
             }
         }, cancellationToken)).ToArray();
@@ -208,6 +233,7 @@ public sealed class BackupEngine(
         IStorageBackend destinationBackend,
         BackupJobDefinition definition,
         ResiliencePipeline circuitBreaker,
+        Action<TransferProgress> onFileTick,
         CancellationToken cancellationToken)
     {
         using var fileCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -219,6 +245,8 @@ public sealed class BackupEngine(
             {
                 fileCancellation.Cancel();
             }
+
+            onFileTick(reported);
         });
 
         try

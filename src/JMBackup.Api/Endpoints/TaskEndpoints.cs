@@ -11,18 +11,38 @@ public static class TaskEndpoints
     {
         var group = app.MapGroup("/api/tasks").WithTags("Tasks").RequireAuthorization();
 
-        group.MapGet(string.Empty, ListAsync);
-        group.MapGet("/{id:int}", FindAsync);
-        group.MapPost(string.Empty, CreateAsync).WithValidation<CreateTaskRequest>();
-        group.MapPut("/{id:int}", UpdateAsync).WithValidation<UpdateTaskRequest>();
-        group.MapDelete("/{id:int}", DeleteAsync);
-        group.MapPatch("/{id:int}/enabled", SetEnabledAsync);
+        group.MapGet(string.Empty, ListAsync).Produces<IEnumerable<TaskResponse>>();
+        group.MapGet("/summary", SummaryAsync).Produces<IEnumerable<TaskSummaryResponse>>();
+        group.MapGet("/{id:int}", FindAsync).Produces<TaskResponse>().Produces(StatusCodes.Status404NotFound);
+        group.MapPost(string.Empty, CreateAsync).WithValidation<CreateTaskRequest>().Produces<TaskResponse>(StatusCodes.Status201Created);
+        group.MapPut("/{id:int}", UpdateAsync).WithValidation<UpdateTaskRequest>()
+            .Produces<TaskResponse>().Produces(StatusCodes.Status404NotFound);
+        group.MapDelete("/{id:int}", DeleteAsync).Produces(StatusCodes.Status204NoContent);
+        group.MapPatch("/{id:int}/enabled", SetEnabledAsync).Produces<TaskResponse>().Produces(StatusCodes.Status404NotFound);
     }
 
     private static async Task<IResult> ListAsync(ITaskRepository repository, CancellationToken cancellationToken)
     {
         var tasks = await repository.ListAsync(cancellationToken).ConfigureAwait(false);
         return Results.Ok(tasks.Select(task => task.ToResponse()));
+    }
+
+    /// <summary>RF-01/RF-04: la pantalla principal pide esto, no la lista simple — evita que el frontend arme el cruce a mano.</summary>
+    private static async Task<IResult> SummaryAsync(
+        ITaskRepository taskRepository, IRunRepository runRepository, ITaskScheduler scheduler, CancellationToken cancellationToken)
+    {
+        var tasks = await taskRepository.ListAsync(cancellationToken).ConfigureAwait(false);
+        var lastRuns = await runRepository.GetLastRunPerTaskAsync(cancellationToken).ConfigureAwait(false);
+
+        var summaries = new List<TaskSummaryResponse>();
+        foreach (var task in tasks)
+        {
+            var nextRunAtUtc = await scheduler.GetNextFireTimeUtcAsync(task.Id, cancellationToken).ConfigureAwait(false);
+            var lastRun = lastRuns.TryGetValue(task.Id, out var run) ? run.ToSummary() : null;
+            summaries.Add(new TaskSummaryResponse(task.Id, task.Name, task.GroupId, task.Enabled, lastRun, nextRunAtUtc));
+        }
+
+        return Results.Ok(summaries);
     }
 
     private static async Task<IResult> FindAsync(int id, ITaskRepository repository, CancellationToken cancellationToken)

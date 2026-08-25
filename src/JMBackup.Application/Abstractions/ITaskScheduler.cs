@@ -10,4 +10,10 @@ public interface ITaskScheduler
     Task RescheduleAsync(int taskId, CancellationToken cancellationToken);
 
     Task UnscheduleAsync(int taskId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Próximo disparo programado, o <c>null</c> si la tarea no tiene disparadores
+    /// activos (deshabilitada, sin horarios, o ya disparó su última ocurrencia).
+    /// </summary>
+    Task<DateTimeOffset?> GetNextFireTimeUtcAsync(int taskId, CancellationToken cancellationToken);
 }

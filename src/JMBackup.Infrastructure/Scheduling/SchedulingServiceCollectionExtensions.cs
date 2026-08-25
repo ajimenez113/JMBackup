@@ -1,6 +1,7 @@
 using JMBackup.Application.Abstractions;
 using JMBackup.Infrastructure.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Quartz;
 
 namespace JMBackup.Infrastructure.Scheduling;
@@ -27,6 +28,7 @@ public static class SchedulingServiceCollectionExtensions
 
         services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
         services.AddScoped<ITaskScheduler, QuartzTaskScheduler>();
+        services.AddHostedService<RetentionPurgeScheduler>();
 
         return services;
     }

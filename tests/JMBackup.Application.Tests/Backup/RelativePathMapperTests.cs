@@ -36,4 +36,26 @@ public class RelativePathMapperTests
 
         result.Should().Be("SERVIDOR/recurso/archivo.txt");
     }
+
+    /// <summary>
+    /// Regresión: las rutas de origen guardadas por el asistente tienen "\" nativo de
+    /// Windows (p. ej. "C:\Users\ajimenez\Documentos"), no "/" — con eso, GetLeafName
+    /// no encontraba ningún separador y devolvía la ruta absoluta entera como "nombre
+    /// de hoja", rompiendo la ruta de destino de cada archivo copiado.
+    /// </summary>
+    [Fact]
+    public void NotAbsolute_WindowsStyleSourceRoot_PrefixesWithTheSourceRootLeafNameOnly()
+    {
+        var result = RelativePathMapper.Map(@"C:\Users\ajimenez\Documentos", "archivo.txt", absolutePaths: false);
+
+        result.Should().Be("Documentos/archivo.txt");
+    }
+
+    [Fact]
+    public void Absolute_WindowsStyleSourceRoot_ReplicatesTheFullSourcePathWithoutTheDriveColon()
+    {
+        var result = RelativePathMapper.Map(@"C:\Users\ajimenez\Documentos", "archivo.txt", absolutePaths: true);
+
+        result.Should().Be("C/Users/ajimenez/Documentos/archivo.txt");
+    }
 }

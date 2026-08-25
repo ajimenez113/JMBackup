@@ -16,10 +16,11 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth").WithTags("Auth");
 
-        group.MapPost("/login", LoginAsync).AllowAnonymous().RequireRateLimiting("login");
+        group.MapPost("/login", LoginAsync).AllowAnonymous().RequireRateLimiting("login")
+            .Produces<SessionResponse>().Produces(StatusCodes.Status401Unauthorized);
         Func<HttpContext, Task<IResult>> logoutHandler = LogoutAsync;
         group.MapPost("/logout", logoutHandler);
-        group.MapGet("/session", GetSessionAsync).AllowAnonymous();
+        group.MapGet("/session", GetSessionAsync).AllowAnonymous().Produces<SessionResponse>();
     }
 
     private static async Task<IResult> LoginAsync(

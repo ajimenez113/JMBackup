@@ -12,7 +12,8 @@ public static class ScheduleEndpoints
         var group = app.MapGroup("/api/tasks/{taskId:int}/schedules").WithTags("Tasks").RequireAuthorization();
 
         group.MapGet(string.Empty, async (int taskId, ITaskRepository repository, CancellationToken cancellationToken) =>
-            Results.Ok((await repository.GetSchedulesAsync(taskId, cancellationToken).ConfigureAwait(false)).Select(s => s.ToResponse())));
+            Results.Ok((await repository.GetSchedulesAsync(taskId, cancellationToken).ConfigureAwait(false)).Select(s => s.ToResponse())))
+            .Produces<IEnumerable<ScheduleResponse>>();
 
         group.MapPost(string.Empty, async (
             int taskId, ScheduleRequest request, ITaskRepository repository, ITaskScheduler scheduler, CancellationToken cancellationToken) =>
@@ -21,7 +22,7 @@ public static class ScheduleEndpoints
             var id = await repository.AddScheduleAsync(entity, cancellationToken).ConfigureAwait(false);
             await scheduler.RescheduleAsync(taskId, cancellationToken).ConfigureAwait(false);
             return Results.Created($"/api/tasks/{taskId}/schedules/{id}", entity.ToResponse());
-        }).WithValidation<ScheduleRequest>();
+        }).WithValidation<ScheduleRequest>().Produces<ScheduleResponse>(StatusCodes.Status201Created);
 
         group.MapPut("/{scheduleId:int}", async (
             int taskId, int scheduleId, ScheduleRequest request, ITaskRepository repository, ITaskScheduler scheduler,
@@ -40,7 +41,7 @@ public static class ScheduleEndpoints
             await repository.UpdateScheduleAsync(entity, cancellationToken).ConfigureAwait(false);
             await scheduler.RescheduleAsync(taskId, cancellationToken).ConfigureAwait(false);
             return Results.Ok(entity.ToResponse());
-        }).WithValidation<ScheduleRequest>();
+        }).WithValidation<ScheduleRequest>().Produces<ScheduleResponse>();
 
         group.MapDelete("/{scheduleId:int}", async (
             int taskId, int scheduleId, ITaskRepository repository, ITaskScheduler scheduler, CancellationToken cancellationToken) =>
@@ -48,6 +49,6 @@ public static class ScheduleEndpoints
             await repository.DeleteScheduleAsync(taskId, scheduleId, cancellationToken).ConfigureAwait(false);
             await scheduler.RescheduleAsync(taskId, cancellationToken).ConfigureAwait(false);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
     }
 }

@@ -60,3 +60,10 @@ public sealed record ScheduleRequest(string Frequency, IReadOnlyList<int>? Weekd
 
 public sealed record ScheduleResponse(
     int Id, string Frequency, IReadOnlyList<int> Weekdays, IReadOnlyList<int> MonthDays, IReadOnlyList<string> Times);
+
+/// <summary>La última ejecución de una tarea, para el panel de salud (RF-04).</summary>
+public sealed record LastRunSummary(DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string Status, int FilesOk, int FilesFailed);
+
+/// <summary>Fila de la pantalla principal (RF-01): la tarea, su última ejecución y su próximo disparo programado.</summary>
+public sealed record TaskSummaryResponse(
+    int Id, string Name, int? GroupId, bool Enabled, LastRunSummary? LastRun, DateTimeOffset? NextRunAtUtc);

@@ -151,9 +151,9 @@ partirla en dos o tres sesiones (componentes base → pantalla principal → asi
 tarea → configuración y logs).
 
 ### Identidad visual, no negociable
-- Azul marino `#000080` en bordes, contornos, sombras, foco y acentos
-- Ese azul **no cambia** entre tema claro y oscuro
-- Sobre fondo oscuro, `#4D4DFF` para texto y elementos interactivos
+- Azul marino `#000080` en bordes, contornos, sombras, foco y acentos, en tema claro
+- En tema oscuro, `#04C2D6` en bordes y `#00DEF5` en texto y elementos interactivos
+  (el azul marino se leía mal en varias pantallas; ver `docs/00-ESPECIFICACION.md` §2)
 - Bordes redondeados de 12 px y sombras suaves en todo
 - Minimalista, con aire. Nada recargado
 - Semáforo: verde `#16A34A`, amarillo `#EAB308`, rojo `#DC2626`

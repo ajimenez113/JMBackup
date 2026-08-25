@@ -11,10 +11,10 @@ public class SmokeTests(ApiWebApplicationFactory factory)
     {
         using var client = factory.CreateClient();
 
-        // Todavía no hay endpoints (llegan en la fase 2): un 404 confirma que Kestrel,
-        // el enrutamiento y el arranque de JMBackupDbContext funcionaron sin excepción.
-        var response = await client.GetAsync(new Uri("/", UriKind.Relative));
+        // Un endpoint real y anónimo confirma que Kestrel, el enrutamiento y el
+        // arranque de JMBackupDbContext (migraciones incluidas) funcionaron sin excepción.
+        var response = await client.GetAsync(new Uri("/api/auth/session", UriKind.Relative));
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

@@ -27,8 +27,7 @@ implementado; ver `docs/00-ESPECIFICACION.md` y `docs/02-ROADMAP-HITO1.md`.
   APIs de Windows (servicio, DPAPI, SMB) a propósito.
 - **[.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)** (LTS). La
   versión exacta usada en este repositorio está fijada en `global.json`.
-- **Node.js 20+** y npm, para compilar la interfaz web (`web/`). No hace falta todavía
-  en la fase 0: el proyecto React se crea en la fase 3.
+- **Node.js 20+** y npm, para compilar la interfaz web (`web/`).
 - Un editor con soporte de C# — Visual Studio 2022 (17.13+), VS Code con el kit de
   desarrollo de C#, o JetBrains Rider.
 
@@ -155,6 +154,13 @@ JMBackup/
 │   ├── JMBackup.Desktop/        # shell WPF con WebView2
 │   └── JMBackup.Cli/            # línea de comandos para correr el motor sin la API
 ├── web/                         # interfaz React + Vite + Tailwind (fase 3)
+│   └── src/
+│       ├── components/           # base reutilizable (Button, Card, Modal…)
+│       ├── features/             # auth/, tasks/, about/ — una carpeta por dominio
+│       ├── layout/                # AppShell, ProtectedRoute
+│       ├── theme/                 # tokens.css, ThemeProvider
+│       ├── i18n/                  # es.ts — todo el texto de la interfaz
+│       └── lib/                   # api-client.ts (generado), SignalR, TanStack Query
 ├── build/                       # instalación del servicio de Windows
 │   └── Install-JMBackupService.ps1
 └── tests/
@@ -192,20 +198,135 @@ Kestrel escucha solo en `127.0.0.1` (ADR-007): la interfaz web queda accesible e
 contraseña vía `PUT /api/settings/security`. El documento OpenAPI se publica en
 `/openapi/v1.json` (ADR-020).
 
-## Instalar como servicio de Windows
+## Interfaz web
+
+```powershell
+cd web
+npm install
+
+# Servidor de desarrollo con recarga en caliente (proxya /api y /hubs hacia
+# https://127.0.0.1:8483 — la API tiene que estar corriendo aparte)
+npm run dev
+
+# Regenerar el cliente TypeScript después de cambiar un contrato de la API
+# (agregar un endpoint, cambiar un DTO): ver ADR-020 y ADR-024
+npm run generate-api
+
+# Build de producción — escribe directo en src/JMBackup.Api/wwwroot,
+# que JMBackup.Api sirve como archivos estáticos con fallback a la SPA
+npm run build
+
+npx tsc -b      # chequeo de tipos
+npm run lint    # oxlint — incluye la regla que prohíbe "any" explícito
+```
+
+`web/src/lib/api-client.ts` es generado (NSwag) y no se versiona: `npm run
+generate-api` lo reconstruye a partir del documento OpenAPI de `JMBackup.Api`. Los
+tokens de la identidad visual (azul marino `#000080`, no negociable) están en
+`web/src/theme/tokens.css`; todo el texto de la interfaz vive en `web/src/i18n/es.ts`
+(RF-122), ningún componente tiene cadenas incrustadas.
+
+## Instalación manual
+
+Guía completa para instalar JMBackup en un equipo sin usar `dotnet run`: los dos
+ejecutables autocontenidos (no hace falta el SDK de .NET en el equipo destino), el
+servicio de Windows, y la aplicación de escritorio.
+
+### 1. Publicar los dos ejecutables
 
 ```powershell
 dotnet publish src/JMBackup.Api -c Release -r win-x64 --self-contained `
   -p:PublishSingleFile=true -o publish
 
+dotnet publish src/JMBackup.Desktop -c Release -r win-x64 --self-contained `
+  -p:PublishSingleFile=true -o publish\desktop
+```
+
+`PublishSingleFile` empaqueta todo el código administrado en un único `.exe`; quedan
+aparte solo las DLL nativas que el runtime y WPF/WebView2 necesitan cargar por fuera
+(SQLite, WebView2Loader, las de gráficos de WPF) — es el comportamiento esperado de
+`PublishSingleFile`, no un empaquetado incompleto. `JMBackup.Desktop` además compila
+con `PublishReadyToRun` (ver su `.csproj`): genera código nativo precompilado para que
+la ventana abra más rápido en el primer uso, a costa de un ejecutable más grande.
+
+Cada carpeta de publicación (`publish`, `publish\desktop`) es autocontenida: se puede
+copiar tal cual a otro equipo sin instalar el SDK ni el runtime de .NET ahí.
+
+### 2. Instalar el servicio de Windows
+
+```powershell
 # En una consola elevada (Administrador):
 .\build\Install-JMBackupService.ps1
 ```
 
-El script crea una cuenta de servicio local dedicada, le otorga *Iniciar sesión como
-servicio*, registra el servicio de Windows, abre la regla de firewall entrante para el
-puerto configurado, y activa `LongPathsEnabled`. Ver comentarios del propio script para
-los parámetros disponibles.
+Por defecto el script crea una cuenta de servicio local dedicada, sin acceso a nada
+fuera de `%ProgramData%` hasta que se lo otorgues a mano carpeta por carpeta (con
+`icacls`) — el modelo más seguro, pero con fricción si vas a respaldar carpetas de tu
+propio perfil de usuario. Si tus tareas respaldan sobre todo a recursos de red con tu
+propia identidad, o preferís que el servicio ya tenga acceso a tus carpetas sin
+configurar permisos una por una, instalalo con tu propia cuenta en su lugar:
+
+```powershell
+.\build\Install-JMBackupService.ps1 -ExistingAccountUsername "TUEQUIPO\tuusuario"
+```
+
+Te va a pedir la contraseña de esa cuenta de forma interactiva (nunca queda en el
+historial ni en ningún archivo). Para cambiar la cuenta de una instalación que ya
+existe, sin reinstalar nada, usá `Set-JMBackupServiceAccount.ps1` en su lugar:
+
+```powershell
+.\build\Set-JMBackupServiceAccount.ps1 -Username "TUEQUIPO\tuusuario"
+```
+
+Cualquiera de las dos formas registra el servicio de Windows, abre la regla de
+firewall entrante para el puerto configurado, y activa `LongPathsEnabled`. Ver
+comentarios del propio script para los demás parámetros disponibles. Al primer
+arranque el servicio genera el certificado autofirmado
+(`%ProgramData%\JMBackup\jmbackup.pfx`) y aplica las migraciones de la base — no hace
+falta ningún paso manual adicional.
+
+Sin credencial configurada, la API solo escucha en `127.0.0.1` (ADR-007): para
+usarla desde otro equipo de la red hay que configurar usuario y contraseña primero, ya
+sea desde la propia interfaz (pestaña Seguridad) estando frente al equipo, o vía
+`PUT /api/settings/security`.
+
+### 3. Instalar la aplicación de escritorio
+
+Copiar toda la carpeta `publish\desktop` al equipo destino — `JMBackup.Desktop.exe`
+necesita el resto de los archivos de esa carpeta a su lado (DLL nativas del runtime).
+No hace falta instalador ni acceso directo: alcanza con ejecutar
+`JMBackup.Desktop.exe`.
+
+Si el servicio de Windows del paso 2 está instalado, la aplicación lo detecta al
+arrancar y, si no está corriendo, lo arranca ella misma — no hace falta nada más. Si
+preferís no instalar el servicio (por ejemplo, para probar en un equipo sin
+privilegios de administrador), copiá además `JMBackup.Api.exe` (de la carpeta
+`publish` del paso 1) dentro de `publish\desktop`, junto a `JMBackup.Desktop.exe`: sin
+servicio instalado, la aplicación lo detecta ahí al lado y lo lanza directamente como
+proceso normal.
+
+### 4. Primer arranque
+
+- **Certificado autofirmado**: la aplicación de escritorio lo acepta automáticamente
+  dentro de su propio WebView2, pero únicamente para `https://127.0.0.1:<puerto>` — no
+  baja la guardia ante cualquier otro certificado inválido que WebView2 encuentre. Para
+  usar la interfaz **desde el navegador de otro equipo** de la red sí hace falta
+  instalar el certificado en el almacén de confianza de ese equipo (o aceptar la
+  advertencia del navegador cada vez); la pestaña Configuración → Web de la propia
+  interfaz ofrece descargarlo.
+- **Bandeja**: la ventana se minimiza a la bandeja del sistema en vez de cerrarse; el
+  ícono muestra en azul marino si el servicio responde y en rojo si no. El menú de la
+  bandeja permite abrir la ventana, ejecutar todas las tareas, pausarlas, y salir de
+  verdad.
+- **Bloqueo por contraseña (RF-104)**: si hay una credencial configurada, restaurar la
+  ventana desde la bandeja pide usuario y contraseña antes de mostrar el contenido. Es
+  un bloqueo nativo independiente de la sesión web de adentro del WebView2: no cierra
+  ni abre esa sesión, solo confirma que quien está frente a la pantalla puede
+  desbloquear.
+- **Arrastrar y soltar / diálogos de archivo**: dentro de la aplicación de escritorio,
+  tanto el explorador nativo como arrastrar una carpeta o archivo sobre la ventana
+  entregan la ruta absoluta real. Desde un navegador común, por restricciones propias
+  del navegador, solo se obtiene el nombre — hay que completar la ruta a mano.
 
 ## Estado actual
 
@@ -224,5 +345,40 @@ cookies `HttpOnly`+`Secure`+`SameSite=Strict`, antiforgery en escrituras, rate l
 nativo en el login, normalización y validación de toda ruta recibida contra path
 traversal; servicio de Windows (`UseWindowsService`) con script de instalación en
 `build/`; Quartz.NET planificando las tareas (RF-30 a RF-32) persistido en la misma
-SQLite. Todavía sin interfaz gráfica — eso empieza en la fase 3
-(`docs/02-ROADMAP-HITO1.md`).
+SQLite.
+
+**Fase 3 completa** (hito 1): Vite + React 18 + TypeScript + Tailwind v4 con los
+tokens de tema; componentes base (Button, Card, Tabs, Table, Modal, Tooltip, Switch,
+Input, Select, ProgressBar, StatusDot, varios sobre primitivas de Radix UI); cliente
+de API generado por NSwag + TanStack Query; conexión SignalR con reconexión
+automática; tema claro/oscuro/sistema; pantalla principal con barra de acciones,
+lista de tareas agrupada y plegable, progreso en vivo y panel de salud (RF-01 a
+RF-04); inicio de sesión y Acerca de; asistente de tarea con seis pestañas — General,
+Archivos (indicador de conectividad por ruta con motivo exacto,
+explorador/manual/arrastrar-y-soltar con el aviso de ruta no absoluta desde el
+navegador), Horario (diaria/semanal/quincenal/mensual/personalizada), Exclusiones
+(RF-40 a RF-46), Filtros (con el aviso de precedencia sobre exclusiones) y Avanzado
+(advertencia de modo espejo, simulación con RF-74); Configuración con cuatro
+pestañas — General (tema, iniciar con Windows, retención con purga automática por
+Quartz, exportar/importar), Transferencia, Seguridad (política de contraseña validada
+en vivo, alcance de la credencial, advertencia de RF-105) y Web (puerto con aviso de
+disponibilidad y sugerencia del siguiente libre, certificado con descarga para el
+almacén de confianza); Historial filtrable por tarea y rango de fechas con
+exportación a CSV, y Logs (respaldados/errores) por ejecución; revisión responsive;
+build de Vite integrado al build de .NET (`src/JMBackup.Api/wwwroot`, con
+`MapFallbackToFile` para las rutas de React Router).
+
+**Fase 4 completa (★ hito 1):** `JMBackup.Desktop`, shell WPF que hospeda la misma
+interfaz web dentro de un `WebView2` apuntando a `https://127.0.0.1:8483`; bandeja con
+`H.NotifyIcon.Wpf` (abrir, ejecutar todo, pausar, salir, ícono con el estado del
+servicio); puente nativo por `WebMessageReceived` con validación de origen contra el
+backend exacto en cada mensaje (`NativeBridgeHandler`) para diálogos nativos de
+archivo/carpeta y arrastrar-y-soltar con ruta absoluta real (`AllowExternalDrop`);
+aceptación acotada del certificado autofirmado solo para el origen local esperado
+(`ServerCertificateErrorDetected`); detección y arranque automático del servicio si no
+está corriendo, con reintento directo del ejecutable como respaldo
+(`ServiceLauncher`); bloqueo nativo de la ventana al restaurar de la bandeja si hay
+credencial configurada (RF-104, `LockOverlay`), independiente de la sesión web interna;
+publicación autocontenida de ambos ejecutables en archivo único, con `ReadyToRun` en el
+de escritorio. **Hito 1 completo** en cuanto a lo que se puede construir en código —
+quedan las pruebas manuales de `docs/02-ROADMAP-HITO1.md` § Criterios de aceptación.

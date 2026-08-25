@@ -52,21 +52,22 @@ comparación tricolor, VSS, instalador con Inno Setup.
 
 | Elemento | Valor |
 |---|---|
-| Color de marca | Azul marino `#000080` — RGB(0, 0, 128) |
+| Color de marca (tema claro) | Azul marino `#000080` — RGB(0, 0, 128) |
+| Color de marca (tema oscuro) | Cian `#04C2D6` para bordes, `#00DEF5` para texto y elementos interactivos |
 | Uso | Bordes, contornos, sombras, foco, acentos y estados activos |
 | Temas | Claro y oscuro, conmutables desde Configuración |
-| Regla | El azul marino **no cambia** entre temas. Es el identificador de la app |
 | Estilo | Minimalista: bordes redondeados, sombras suaves, mucho aire |
 
 **[DECISIÓN]** Sobre fondo oscuro, `#000080` puro no alcanza el contraste mínimo para
-texto (falla WCAG AA). Se define: `#000080` como base para bordes y sombras en ambos
-temas, y `#4D4DFF` para texto y elementos interactivos sobre fondo oscuro. Se
-conserva la identidad y también la accesibilidad.
+texto (falla WCAG AA) y además se lee mal en varias pantallas. Primero se probó
+`#4D4DFF` sobre el mismo azul; en el uso real seguía sin leerse bien, así que se
+cambió de familia de color por completo para el tema oscuro: `#04C2D6` para bordes y
+`#00DEF5` para texto y elementos interactivos. El tema claro no cambia.
 
 Tokens (`web/src/theme/tokens.css`):
 ```
---jm-brand: #000080;
---jm-brand-light: #4D4DFF;
+--jm-brand: #000080;             /* tema claro; #04C2D6 en tema oscuro */
+--jm-brand-light: #4D4DFF;       /* sin uso en tema oscuro desde el cambio de color */
 --jm-radius: 12px;
 --jm-shadow: 0 2px 12px rgba(0, 0, 128, 0.18);
 --jm-shadow-lg: 0 8px 32px rgba(0, 0, 128, 0.24);

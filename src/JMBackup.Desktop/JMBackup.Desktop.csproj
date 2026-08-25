@@ -4,6 +4,16 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- RID, self-contained y PublishSingleFile van como parámetros de "dotnet
+         publish" (ver README), no acá: son decisiones del momento de publicar, no
+         del proyecto. ReadyToRun sí es una propiedad del proyecto. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="H.NotifyIcon.Wpf" />
+    <PackageReference Include="Microsoft.Web.WebView2" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" />
+  </ItemGroup>
 
 </Project>

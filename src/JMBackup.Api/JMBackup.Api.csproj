@@ -2,6 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Documento OpenAPI para que web/ genere su cliente TypeScript con NSwag
+         (ADR-020). Referenciar Microsoft.Extensions.ApiDescription.Server ya deja
+         OpenApiGenerateDocuments/OnBuild en "true" por defecto (no alcanza con omitir
+         la propiedad) — hay que apagarlo a mano: el subproceso "dotnet-getdocument"
+         que dispara ese target se cuelga si corre junto con el resto de la solución
+         bajo "dotnet build" (ver ADR-024). Se genera a demanda con
+         "npm run generate-api" (web/package.json), que invoca el target
+         GenerateOpenApiDocuments contra este único proyecto antes de correr NSwag. -->
+    <OpenApiGenerateDocumentsOnBuild>false</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)\..\..\web\openapi</OpenApiDocumentsDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +22,10 @@
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

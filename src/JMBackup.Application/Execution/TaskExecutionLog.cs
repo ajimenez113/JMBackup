@@ -24,4 +24,7 @@ internal static partial class TaskExecutionLog
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No se pudo publicar el progreso de la tarea {TaskId}")]
     public static partial void ProgressPublishFailed(ILogger logger, Exception exception, int taskId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "No se pudo avisar que la tarea {TaskId} terminó")]
+    public static partial void RunFinishedPublishFailed(ILogger logger, Exception exception, int taskId);
 }

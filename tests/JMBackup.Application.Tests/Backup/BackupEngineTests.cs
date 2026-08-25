@@ -211,6 +211,50 @@ public class BackupEngineTests
     }
 
     [Fact]
+    public async Task RunAsync_ReportsProgressWithOkFailedSplitAndTotalPlanBytes()
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        var source = new InMemoryStorageBackend(timeProvider);
+        source.AddFile("ok.txt", [1, 2, 3], timeProvider.GetUtcNow());
+        source.AddFile("falla.txt", [4, 5, 6, 7], timeProvider.GetUtcNow());
+        var destination = new InMemoryStorageBackend(timeProvider);
+        for (var i = 0; i < 10; i++)
+        {
+            destination.EnqueueWriteFailure(
+                "origen/falla.txt",
+                new StorageOperationException(StorageErrorReason.PermissionDenied, "falla.txt", "falla permanente de prueba"));
+        }
+
+        var reports = new List<BackupProgress>();
+        var progress = new Progress<BackupProgress>(reports.Add);
+
+        var (engine, _) = CreateEngine(timeProvider);
+        var runTask = Task.Run(() => engine.RunAsync(
+            SingleFileDefinition(BackupMode.Incremental),
+            new Dictionary<string, IStorageBackend> { ["origen"] = source },
+            new Dictionary<string, IStorageBackend> { ["destino"] = destination },
+            dryRun: false,
+            progress,
+            CancellationToken.None));
+        var result = await AdvanceUntilCompleteAsync(runTask, timeProvider);
+
+        result.FilesCopied.Should().Be(1);
+        result.Errors.Should().ContainSingle();
+
+        // Progress<T> despacha al SynchronizationContext capturado, de forma asincrónica:
+        // hace falta esperar a que drene antes de mirar la lista.
+        for (var i = 0; i < 50 && reports.Count == 0; i++)
+        {
+            await Task.Delay(10);
+        }
+
+        reports.Should().NotBeEmpty();
+        reports.Should().Contain(r => r.FilesOk == 1);
+        reports.Should().Contain(r => r.FilesFailed >= 1);
+        reports.Should().OnlyContain(r => r.BytesTotal == 7); // ok.txt (3) + falla.txt (4): el total del plan no cambia entre pasadas de reintento.
+    }
+
+    [Fact]
     public async Task RunAsync_CancelledBeforeStarting_ThrowsOperationCanceledException()
     {
         var timeProvider = new FakeTimeProvider();

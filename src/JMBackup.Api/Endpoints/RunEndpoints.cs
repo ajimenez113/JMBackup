@@ -12,20 +12,21 @@ public static class RunEndpoints
         var group = app.MapGroup("/api/runs").WithTags("Runs").RequireAuthorization();
 
         group.MapGet(string.Empty, async (int? taskId, DateTimeOffset? from, DateTimeOffset? until, IRunRepository repository, CancellationToken cancellationToken) =>
-            Results.Ok((await repository.ListAsync(taskId, from, until, cancellationToken).ConfigureAwait(false)).Select(r => r.ToResponse())));
+            Results.Ok((await repository.ListAsync(taskId, from, until, cancellationToken).ConfigureAwait(false)).Select(r => r.ToResponse())))
+            .Produces<IEnumerable<RunResponse>>();
 
         group.MapGet("/{id:int}", async (int id, IRunRepository repository, CancellationToken cancellationToken) =>
         {
             var run = await repository.FindAsync(id, cancellationToken).ConfigureAwait(false);
             return run is null ? Results.NotFound() : Results.Ok(run.ToResponse());
-        });
+        }).Produces<RunResponse>().Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/{id:int}/items", async (int id, string? status, IRunRepository repository, CancellationToken cancellationToken) =>
         {
             var parsedStatus = status is { Length: > 0 } ? Enum.Parse<Domain.Enums.RunItemStatus>(status) : (Domain.Enums.RunItemStatus?)null;
             var items = await repository.GetItemsAsync(id, parsedStatus, cancellationToken).ConfigureAwait(false);
             return Results.Ok(items.Select(i => i.ToResponse()));
-        });
+        }).Produces<IEnumerable<RunItemResponse>>();
 
         group.MapGet("/export.csv", async (int? taskId, DateTimeOffset? from, DateTimeOffset? until, IRunRepository repository, CancellationToken cancellationToken) =>
         {

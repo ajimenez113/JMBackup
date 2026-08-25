@@ -1,0 +1,79 @@
+@import 'tailwindcss';
+
+/*
+ * Identidad visual de JMBackup (docs/00-ESPECIFICACION.md §2): el azul marino #000080
+ * es el color de marca en tema claro — bordes, contornos, sombras, foco y acentos.
+ * En tema oscuro #000080 no se lee bien en varias pantallas, así que ahí bordes,
+ * foco, acentos y texto interactivo usan #04C2D6/#00DEF5 en su lugar (ver los
+ * bloques de --jm-brand y --jm-accent-text más abajo).
+ */
+:root {
+  --jm-brand: #000080;
+  --jm-brand-light: #4d4dff;
+  --jm-radius: 12px;
+  --jm-shadow: 0 2px 12px rgba(0, 0, 128, 0.18);
+  --jm-shadow-lg: 0 8px 32px rgba(0, 0, 128, 0.24);
+
+  --jm-success: #16a34a;
+  --jm-warning: #eab308;
+  --jm-danger: #dc2626;
+  --jm-idle: #94a3b8;
+
+  /* Tema claro (por defecto) */
+  --jm-bg-canvas: #f5f6fa;
+  --jm-bg-elevated: #ffffff;
+  --jm-fg: #10142a;
+  --jm-fg-muted: #5b6172;
+  --jm-border-subtle: rgba(0, 0, 128, 0.14);
+  --jm-accent-text: var(--jm-brand);
+  --jm-accent-contrast: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --jm-brand: #04c2d6;
+    --jm-bg-canvas: #0b0d17;
+    --jm-bg-elevated: #12162a;
+    --jm-fg: #e8e9f5;
+    --jm-fg-muted: #9ca0b8;
+    --jm-border-subtle: rgba(0, 222, 245, 0.22);
+    --jm-accent-text: #00def5;
+    --jm-accent-contrast: #10142a;
+  }
+}
+
+:root[data-theme='dark'] {
+  --jm-brand: #04c2d6;
+  --jm-bg-canvas: #0b0d17;
+  --jm-bg-elevated: #12162a;
+  --jm-fg: #e8e9f5;
+  --jm-fg-muted: #9ca0b8;
+  --jm-border-subtle: rgba(0, 222, 245, 0.22);
+  --jm-accent-text: #00def5;
+  --jm-accent-contrast: #10142a;
+}
+
+@theme {
+  --color-brand: var(--jm-brand);
+  --color-brand-light: var(--jm-brand-light);
+  --color-accent: var(--jm-accent-text);
+  --color-accent-contrast: var(--jm-accent-contrast);
+  --color-bg-canvas: var(--jm-bg-canvas);
+  --color-bg-elevated: var(--jm-bg-elevated);
+  --color-fg: var(--jm-fg);
+  --color-fg-muted: var(--jm-fg-muted);
+  --color-border-subtle: var(--jm-border-subtle);
+  --color-success: var(--jm-success);
+  --color-warning: var(--jm-warning);
+  --color-danger: var(--jm-danger);
+  --color-idle: var(--jm-idle);
+
+  --radius-jm: var(--jm-radius);
+  --shadow-jm: var(--jm-shadow);
+  --shadow-jm-lg: var(--jm-shadow-lg);
+}
+
+body {
+  background-color: var(--jm-bg-canvas);
+  color: var(--jm-fg);
+}

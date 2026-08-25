@@ -21,4 +21,7 @@ public interface IRunRepository
 
     /// <summary>Purga historial y logs más viejos que la retención configurada (RF-133).</summary>
     Task PurgeOlderThanAsync(DateTimeOffset threshold, CancellationToken cancellationToken);
+
+    /// <summary>La ejecución más reciente de cada tarea que tenga al menos una (RF-04: panel de salud).</summary>
+    Task<IReadOnlyDictionary<int, Run>> GetLastRunPerTaskAsync(CancellationToken cancellationToken);
 }

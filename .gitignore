@@ -45,6 +45,12 @@ yarn-error.log*
 src/JMBackup.Api/wwwroot/**
 !src/JMBackup.Api/wwwroot/.gitkeep
 
+# Documento OpenAPI (se genera en cada build de JMBackup.Api, ADR-020) y cliente
+# TypeScript generado a partir de él (npm run generate-api): son derivados del
+# código de la API, no fuente — regenerarlos es parte del flujo de build normal.
+web/openapi/
+web/src/lib/api-client.ts
+
 # =====================================================================
 # Sistema operativo / editor
 # =====================================================================

@@ -36,4 +36,7 @@ public sealed class JMBackupDbContext(DbContextOptions<JMBackupDbContext> option
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(JMBackupDbContext).Assembly);
     }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
+        configurationBuilder.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToUtcDateTimeConverter>();
 }

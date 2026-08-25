@@ -25,6 +25,19 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
 
     public ApiWebApplicationFactory() => Environment.SetEnvironmentVariable(DataDirectoryVariable, _tempDataDirectory.FullName);
 
+    /// <summary>
+    /// La cookie de antiforgery se configura con <c>SecurePolicy = Always</c>
+    /// (CLAUDE.md §6): <c>CreateClient()</c> usa <c>http://localhost</c> como
+    /// <c>BaseAddress</c> por defecto, así que <c>HttpContext.Request.IsHttps</c> da
+    /// falso y el servidor tira <c>InvalidOperationException</c> apenas se pide el
+    /// token de antiforgery. <c>ConfigureClient</c> no sirve para esto: la clase base
+    /// pisa <c>client.BaseAddress</c> con el de las opciones después de llamarlo. Las
+    /// pruebas que llegan a un endpoint que muta estado (todo lo que no sea GET) tienen
+    /// que usar este cliente en vez de <see cref="WebApplicationFactory{TEntryPoint}.CreateClient()"/>.
+    /// </summary>
+    public HttpClient CreateSecureClient() =>
+        CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

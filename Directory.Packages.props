@@ -1,43 +1,39 @@
 <Project>
-
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-
   <ItemGroup Label="Pruebas">
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="H.NotifyIcon.Wpf" Version="2.4.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
+    <PackageVersion Include="System.ServiceProcess.ServiceController" Version="10.0.11" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="FluentAssertions" Version="8.10.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
   </ItemGroup>
-
   <ItemGroup Label="Persistencia">
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
   </ItemGroup>
-
   <ItemGroup Label="Logging">
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
   </ItemGroup>
-
   <ItemGroup Label="Motor de copia (fase 1)">
     <PackageVersion Include="Microsoft.Extensions.Resilience" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.321" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
   </ItemGroup>
-
   <ItemGroup Label="Pruebas de tiempo simulado (fase 1)">
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.9.0" />
   </ItemGroup>
-
   <ItemGroup Label="API, seguridad y planificación (fase 2)">
     <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
@@ -47,5 +43,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.11" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
   </ItemGroup>
-
+  <ItemGroup Label="Interfaz web (fase 3)">
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.0" />
+  </ItemGroup>
 </Project>

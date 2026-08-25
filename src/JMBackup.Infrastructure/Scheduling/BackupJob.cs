@@ -1,3 +1,4 @@
+using System.Globalization;
 using JMBackup.Application.Execution;
 using Quartz;
 
@@ -10,7 +11,11 @@ public sealed class BackupJob(TaskExecutionCoordinator coordinator) : IJob
 
     public Task Execute(IJobExecutionContext context)
     {
-        var taskId = context.JobDetail.JobDataMap.GetInt(TaskIdDataKey);
+        // Se guarda como string porque UseProperties = true (Quartz, ver
+        // QuartzTaskScheduler) no acepta otro tipo en el JobDataMap.
+        var taskIdText = context.JobDetail.JobDataMap.GetString(TaskIdDataKey)
+            ?? throw new InvalidOperationException($"El trabajo de Quartz '{context.JobDetail.Key}' no tiene '{TaskIdDataKey}'.");
+        var taskId = int.Parse(taskIdText, CultureInfo.InvariantCulture);
         return coordinator.RunTaskAsync(taskId, dryRun: false, context.CancellationToken);
     }
 }

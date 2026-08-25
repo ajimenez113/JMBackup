@@ -29,19 +29,24 @@ public sealed class TaskExecutionCoordinator(
     IProgressPublisher progressPublisher,
     ILogger<TaskExecutionCoordinator> logger)
 {
-    public async Task RunTaskAsync(int taskId, bool dryRun, CancellationToken externalCancellationToken)
+    /// <summary>
+    /// Devuelve el <see cref="BackupResult"/> de la ejecución (RF-74: la simulación lo
+    /// necesita para mostrar qué se copiaría, omitiría y eliminaría), o <c>null</c> si
+    /// la tarea no existe o está deshabilitada y no era una simulación.
+    /// </summary>
+    public async Task<BackupResult?> RunTaskAsync(int taskId, bool dryRun, CancellationToken externalCancellationToken)
     {
         var task = await taskRepository.FindAsync(taskId, externalCancellationToken).ConfigureAwait(false);
         if (task is null)
         {
             TaskExecutionLog.TaskNotFound(logger, taskId);
-            return;
+            return null;
         }
 
         if (!task.Enabled && !dryRun)
         {
             TaskExecutionLog.TaskDisabled(logger, task.Name);
-            return;
+            return null;
         }
 
         var paths = await taskRepository.GetPathsAsync(taskId, externalCancellationToken).ConfigureAwait(false);
@@ -119,6 +124,7 @@ public sealed class TaskExecutionCoordinator(
             }
 
             TaskExecutionLog.TaskCompleted(logger, task.Name, result.Duration, correlationId);
+            return result;
         }
         catch (OperationCanceledException)
         {
@@ -128,6 +134,8 @@ public sealed class TaskExecutionCoordinator(
                 run.Status = RunStatus.Cancelled;
                 await runRepository.UpdateAsync(run, externalCancellationToken).ConfigureAwait(false);
             }
+
+            return null;
         }
         catch (Exception ex)
         {
@@ -137,7 +145,28 @@ public sealed class TaskExecutionCoordinator(
                 run.FinishedAt = timeProvider.GetUtcNow();
                 run.Status = RunStatus.Failed;
                 await runRepository.UpdateAsync(run, externalCancellationToken).ConfigureAwait(false);
+
+                // Esto pasa antes de poder procesar un solo archivo (ruta de origen/destino
+                // inaccesible, credencial inválida): no hay ningún RunItem "real" que
+                // explique el fallo, así que se deja uno propio con el motivo — si no, la
+                // pestaña de errores del historial queda vacía y el usuario no tiene forma
+                // de saber por qué falló.
+                await runRepository.AddItemsAsync(
+                    [
+                        new RunItem
+                        {
+                            RunId = run.Id,
+                            Path = "(la tarea completa)",
+                            Size = 0,
+                            Status = RunItemStatus.Failed,
+                            ErrorMessage = ex.Message,
+                            Timestamp = timeProvider.GetUtcNow(),
+                        },
+                    ],
+                    externalCancellationToken).ConfigureAwait(false);
             }
+
+            return null;
         }
         finally
         {
@@ -150,6 +179,11 @@ public sealed class TaskExecutionCoordinator(
             {
                 shareConnector.Disconnect(uncRoot);
             }
+
+            // Sin esto, la interfaz no tiene forma de distinguir "sigue corriendo" de
+            // "ya terminó" salvo esperando al próximo sondeo periódico o cambiando de
+            // pantalla — se queda mostrando "Ejecutándose" indefinidamente.
+            await PublishRunFinishedAsync(taskId, run.Id).ConfigureAwait(false);
         }
     }
 
@@ -216,6 +250,18 @@ public sealed class TaskExecutionCoordinator(
         catch (Exception ex)
         {
             TaskExecutionLog.ProgressPublishFailed(logger, ex, taskId);
+        }
+    }
+
+    private async Task PublishRunFinishedAsync(int taskId, int runId)
+    {
+        try
+        {
+            await progressPublisher.PublishRunFinishedAsync(taskId, runId, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            TaskExecutionLog.RunFinishedPublishFailed(logger, ex, taskId);
         }
     }
 }

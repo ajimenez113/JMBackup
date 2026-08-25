@@ -1,8 +1,12 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using JMBackup.Api.Contracts;
 using JMBackup.Api.Validators;
 using JMBackup.Application.Abstractions;
 using JMBackup.Application.Settings;
 using JMBackup.Application.Tasks;
+using JMBackup.Infrastructure.Security;
 
 namespace JMBackup.Api.Endpoints;
 
@@ -17,7 +21,7 @@ public static class SettingsEndpoints
         {
             var value = await settings.GetSecurityAsync(ct).ConfigureAwait(false);
             return Results.Ok(new SecuritySettingsResponse(value.Username, value.RequireCredentialFor.ToString(), value.SessionInactivityMinutes, value.AllowUnauthenticatedLan));
-        });
+        }).Produces<SecuritySettingsResponse>();
 
         group.MapPut("/security", PutSecurityAsync).WithValidation<SecuritySettingsRequest>();
 
@@ -25,19 +29,41 @@ public static class SettingsEndpoints
         {
             var value = await settings.GetWebAsync(ct).ConfigureAwait(false);
             return Results.Ok(new WebSettingsRequest(value.ListenAddress, value.Port));
-        });
+        }).Produces<WebSettingsRequest>();
 
         group.MapPut("/web", async (WebSettingsRequest request, SettingsService settings, CancellationToken ct) =>
         {
             await settings.SetWebAsync(new WebSettings { ListenAddress = request.ListenAddress, Port = request.Port }, ct).ConfigureAwait(false);
             return Results.Ok();
+        }).WithValidation<WebSettingsRequest>();
+
+        group.MapGet("/web/port-check", async (int port, string? address, SettingsService settings, CancellationToken ct) =>
+        {
+            // Sin "address" se usa la dirección ya configurada: es contra esa que
+            // Kestrel escucha ahora mismo, así que es la comparación que tiene sentido
+            // por defecto. El llamador puede pasar otra si está por cambiarla.
+            var listenAddress = address ?? (await settings.GetWebAsync(ct).ConfigureAwait(false)).ListenAddress;
+            return Results.Ok(CheckPortAvailability(port, listenAddress));
+        }).Produces<PortAvailabilityResponse>();
+
+        group.MapGet("/certificate", (SelfSignedCertificateProvider certificateProvider) =>
+        {
+            using var certificate = certificateProvider.GetOrCreateCertificate();
+            return Results.Ok(new CertificateInfoResponse(certificate.Subject, certificate.Thumbprint, certificate.NotBefore, certificate.NotAfter));
+        }).Produces<CertificateInfoResponse>();
+
+        group.MapGet("/certificate/download", (SelfSignedCertificateProvider certificateProvider) =>
+        {
+            using var certificate = certificateProvider.GetOrCreateCertificate();
+            var publicBytes = certificate.Export(X509ContentType.Cert);
+            return Results.File(publicBytes, "application/x-x509-ca-cert", "jmbackup.cer");
         });
 
         group.MapGet("/general", async (SettingsService settings, CancellationToken ct) =>
         {
             var value = await settings.GetGeneralAsync(ct).ConfigureAwait(false);
             return Results.Ok(new GeneralSettingsRequest(value.Theme, value.StartWithWindows, value.HistoryRetentionDays));
-        });
+        }).Produces<GeneralSettingsRequest>();
 
         group.MapPut("/general", async (GeneralSettingsRequest request, SettingsService settings, CancellationToken ct) =>
         {
@@ -45,14 +71,14 @@ public static class SettingsEndpoints
                 new GeneralSettings { Theme = request.Theme, StartWithWindows = request.StartWithWindows, HistoryRetentionDays = request.HistoryRetentionDays },
                 ct).ConfigureAwait(false);
             return Results.Ok();
-        });
+        }).WithValidation<GeneralSettingsRequest>();
 
         group.MapGet("/transfer", async (SettingsService settings, CancellationToken ct) =>
         {
             var value = await settings.GetTransferAsync(ct).ConfigureAwait(false);
             return Results.Ok(new TransferSettingsRequest(
                 value.MaxParallelTransfers, value.GlobalBandwidthLimitBytesPerSecond, value.BlockSizeBytes, value.PreserveTimestampsAndAttributes));
-        });
+        }).Produces<TransferSettingsRequest>();
 
         group.MapPut("/transfer", async (TransferSettingsRequest request, SettingsService settings, CancellationToken ct) =>
         {
@@ -64,10 +90,54 @@ public static class SettingsEndpoints
                 PreserveTimestampsAndAttributes = request.PreserveTimestampsAndAttributes,
             }, ct).ConfigureAwait(false);
             return Results.Ok();
-        });
+        }).WithValidation<TransferSettingsRequest>();
 
-        group.MapGet("/export", ExportAsync);
+        group.MapGet("/export", ExportAsync).Produces<ExportedConfiguration>();
         group.MapPost("/import", ImportAsync);
+    }
+
+    /// <summary>
+    /// RF-111: si el puerto pedido está libre, se confirma; si no, se sugiere el
+    /// siguiente libre probando puertos consecutivos (hasta 50, para no buscar para
+    /// siempre en un rango completamente ocupado). Se prueba contra la dirección
+    /// específica, no <see cref="IPAddress.Any"/>: Windows no considera en conflicto un
+    /// bind a 0.0.0.0 con otro proceso ya escuchando en 127.0.0.1, así que probar
+    /// contra "cualquier dirección" da falsos negativos con el propio Kestrel
+    /// corriendo (ADR-026).
+    /// </summary>
+    private static PortAvailabilityResponse CheckPortAvailability(int port, string listenAddress)
+    {
+        var address = IPAddress.Parse(listenAddress);
+
+        if (IsPortFree(address, port))
+        {
+            return new PortAvailabilityResponse(IsAvailable: true, SuggestedPort: null);
+        }
+
+        for (var candidate = port + 1; candidate < port + 50 && candidate <= 65535; candidate++)
+        {
+            if (IsPortFree(address, candidate))
+            {
+                return new PortAvailabilityResponse(IsAvailable: false, SuggestedPort: candidate);
+            }
+        }
+
+        return new PortAvailabilityResponse(IsAvailable: false, SuggestedPort: null);
+    }
+
+    private static bool IsPortFree(IPAddress address, int port)
+    {
+        try
+        {
+            using var listener = new TcpListener(address, port);
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
     }
 
     private static async Task<IResult> PutSecurityAsync(

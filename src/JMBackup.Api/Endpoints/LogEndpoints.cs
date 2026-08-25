@@ -14,11 +14,13 @@ public static class LogEndpoints
 
         group.MapGet("/backed-up", async (int runId, IRunRepository repository, CancellationToken cancellationToken) =>
             Results.Ok((await repository.GetItemsAsync(runId, RunItemStatus.Copied, cancellationToken).ConfigureAwait(false))
-                .Select(item => item.ToResponse())));
+                .Select(item => item.ToResponse())))
+            .Produces<IEnumerable<RunItemResponse>>();
 
         group.MapGet("/errors", async (int runId, IRunRepository repository, CancellationToken cancellationToken) =>
             Results.Ok((await repository.GetItemsAsync(runId, RunItemStatus.Failed, cancellationToken).ConfigureAwait(false))
-                .Select(item => item.ToResponse())));
+                .Select(item => item.ToResponse())))
+            .Produces<IEnumerable<RunItemResponse>>();
 
         group.MapGet("/export.csv", async (int runId, IRunRepository repository, CancellationToken cancellationToken) =>
         {

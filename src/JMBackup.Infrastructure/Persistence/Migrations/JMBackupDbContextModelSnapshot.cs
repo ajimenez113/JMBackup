@@ -41,7 +41,7 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("Timestamp")
+                    b.Property<DateTime>("Timestamp")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -65,7 +65,7 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                     b.Property<int>("BackendType")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<byte[]>("EncryptedSecret")
@@ -128,10 +128,10 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("LastBackedUpAt")
+                    b.Property<DateTime>("LastBackedUpAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("ModifiedUtc")
+                    b.Property<DateTime>("ModifiedUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Sha256")
@@ -185,7 +185,7 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                     b.Property<int>("Attempts")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("EnqueuedAt")
+                    b.Property<DateTime>("EnqueuedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Priority")
@@ -235,10 +235,10 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                     b.Property<int>("FilesSkipped")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("FinishedAt")
+                    b.Property<DateTime?>("FinishedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("StartedAt")
+                    b.Property<DateTime>("StartedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
@@ -286,7 +286,7 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("Timestamp")
+                    b.Property<DateTime>("Timestamp")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -362,7 +362,7 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                     b.Property<bool>("AbsolutePaths")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("Enabled")
@@ -391,7 +391,7 @@ namespace JMBackup.Infrastructure.Persistence.Migrations
                     b.Property<bool>("RemoveEmptyDirs")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("VerifyLevel")

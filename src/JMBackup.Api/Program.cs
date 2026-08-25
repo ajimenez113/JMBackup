@@ -100,8 +100,12 @@ builder.Services.AddScoped<IValidator<TaskPathRequest>, TaskPathRequestValidator
 builder.Services.AddScoped<IValidator<ExclusionRequest>, ExclusionRequestValidator>();
 builder.Services.AddScoped<IValidator<FilterRequest>, FilterRequestValidator>();
 builder.Services.AddScoped<IValidator<ScheduleRequest>, ScheduleRequestValidator>();
+builder.Services.AddScoped<IValidator<CredentialRequest>, CredentialRequestValidator>();
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
 builder.Services.AddScoped<IValidator<SecuritySettingsRequest>, SecuritySettingsRequestValidator>();
+builder.Services.AddScoped<IValidator<WebSettingsRequest>, WebSettingsRequestValidator>();
+builder.Services.AddScoped<IValidator<GeneralSettingsRequest>, GeneralSettingsRequestValidator>();
+builder.Services.AddScoped<IValidator<TransferSettingsRequest>, TransferSettingsRequestValidator>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -174,6 +178,7 @@ app.MapTaskPathEndpoints();
 app.MapExclusionEndpoints();
 app.MapFilterEndpoints();
 app.MapScheduleEndpoints();
+app.MapCredentialEndpoints();
 app.MapControlEndpoints();
 app.MapRunEndpoints();
 app.MapLogEndpoints();
@@ -181,6 +186,13 @@ app.MapSettingsEndpoints();
 
 app.MapHub<ProgressHub>("/hubs/progress");
 app.MapOpenApi();
+
+// Interfaz web (fase 3): wwwroot lo escribe "npm run build" (vite.config.ts).
+// MapFallbackToFile deja pasar /api y /hubs (ya mapeados arriba) y solo entrega
+// index.html para rutas que React Router resuelve del lado del cliente.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

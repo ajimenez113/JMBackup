@@ -81,4 +81,18 @@ public sealed class EfRunRepository(IDbContextFactory<JMBackupDbContext> dbConte
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await dbContext.Runs.Where(run => run.StartedAt < threshold).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<IReadOnlyDictionary<int, Run>> GetLastRunPerTaskAsync(CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        var lastRuns = await dbContext.Runs
+            .AsNoTracking()
+            .GroupBy(run => run.TaskId)
+            .Select(group => group.OrderByDescending(run => run.StartedAt).First())
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return lastRuns.ToDictionary(run => run.TaskId);
+    }
 }

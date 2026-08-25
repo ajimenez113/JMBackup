@@ -13,7 +13,8 @@ public static class ExclusionEndpoints
         var group = app.MapGroup("/api/tasks/{taskId:int}/exclusions").WithTags("Tasks").RequireAuthorization();
 
         group.MapGet(string.Empty, async (int taskId, ITaskRepository repository, CancellationToken cancellationToken) =>
-            Results.Ok((await repository.GetExclusionsAsync(taskId, cancellationToken).ConfigureAwait(false)).Select(e => e.ToResponse())));
+            Results.Ok((await repository.GetExclusionsAsync(taskId, cancellationToken).ConfigureAwait(false)).Select(e => e.ToResponse())))
+            .Produces<IEnumerable<ExclusionResponse>>();
 
         group.MapPost(string.Empty, async (
             int taskId, ExclusionRequest request, ITaskRepository repository, CancellationToken cancellationToken) =>
@@ -21,7 +22,7 @@ public static class ExclusionEndpoints
             var entity = request.ToEntity(taskId);
             var id = await repository.AddExclusionAsync(entity, cancellationToken).ConfigureAwait(false);
             return Results.Created($"/api/tasks/{taskId}/exclusions/{id}", entity.ToResponse());
-        }).WithValidation<ExclusionRequest>();
+        }).WithValidation<ExclusionRequest>().Produces<ExclusionResponse>(StatusCodes.Status201Created);
 
         group.MapPut("/{exclusionId:int}", async (
             int taskId, int exclusionId, ExclusionRequest request, ITaskRepository repository, CancellationToken cancellationToken) =>
@@ -41,13 +42,13 @@ public static class ExclusionEndpoints
 
             await repository.UpdateExclusionAsync(entity, cancellationToken).ConfigureAwait(false);
             return Results.Ok(entity.ToResponse());
-        }).WithValidation<ExclusionRequest>();
+        }).WithValidation<ExclusionRequest>().Produces<ExclusionResponse>();
 
         group.MapDelete("/{exclusionId:int}", async (
             int taskId, int exclusionId, ITaskRepository repository, CancellationToken cancellationToken) =>
         {
             await repository.DeleteExclusionAsync(taskId, exclusionId, cancellationToken).ConfigureAwait(false);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
     }
 }
