@@ -18,6 +18,8 @@ public sealed class JMBackupDbContext(DbContextOptions<JMBackupDbContext> option
 
     public DbSet<Credential> Credentials => Set<Credential>();
 
+    public DbSet<TrustedHostKey> TrustedHostKeys => Set<TrustedHostKey>();
+
     public DbSet<Schedule> Schedules => Set<Schedule>();
 
     public DbSet<Exclusion> Exclusions => Set<Exclusion>();

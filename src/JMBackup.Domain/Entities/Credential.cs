@@ -17,7 +17,13 @@ public sealed class Credential
 
     public string? Username { get; set; }
 
+    /// <summary>Contraseña, secret access key de AWS, o contenido de una clave privada de SFTP, según <see cref="AuthKind"/>.</summary>
     public required byte[] EncryptedSecret { get; set; }
+
+    public CredentialAuthKind AuthKind { get; set; } = CredentialAuthKind.Password;
+
+    /// <summary>Passphrase de la clave privada de SFTP, si la tiene. Solo tiene sentido con <see cref="CredentialAuthKind.PrivateKey"/>.</summary>
+    public byte[]? EncryptedPassphrase { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 }

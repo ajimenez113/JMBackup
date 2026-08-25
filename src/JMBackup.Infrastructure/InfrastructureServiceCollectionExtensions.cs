@@ -18,6 +18,7 @@ public static class InfrastructureServiceCollectionExtensions
         .AddScoped<ITaskGroupRepository, EfTaskGroupRepository>()
         .AddScoped<IRunRepository, EfRunRepository>()
         .AddScoped<ICredentialRepository, EfCredentialRepository>()
+        .AddScoped<IHostKeyStore, EfHostKeyStore>()
         .AddScoped<IAuditLogRepository, EfAuditLogRepository>();
 
     /// <summary>
