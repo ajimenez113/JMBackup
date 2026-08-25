@@ -12,4 +12,10 @@
     <InternalsVisibleTo Include="JMBackup.Storage.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="FluentFTP" />
+    <PackageReference Include="SSH.NET" />
+  </ItemGroup>
+
 </Project>

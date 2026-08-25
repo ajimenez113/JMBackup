@@ -46,4 +46,13 @@
   <ItemGroup Label="Interfaz web (fase 3)">
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.0" />
   </ItemGroup>
+  <ItemGroup Label="Destinos remotos (fase 5, hito 2)">
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.102.4" />
+    <PackageVersion Include="FluentFTP" Version="54.2.0" />
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+  <ItemGroup Label="Pruebas de destinos remotos con contenedores (fase 5, hito 2)">
+    <PackageVersion Include="Testcontainers" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.LocalStack" Version="4.14.0" />
+  </ItemGroup>
 </Project>
