@@ -243,7 +243,7 @@ public sealed class LocalStorageBackendTests : IDisposable
         using var cts = new CancellationTokenSource();
         var content = new ThrowingStream(cts);
 
-        var act = () => backend.WriteAsync("archivo.txt", content, 100, new Progress<TransferProgress>(), cts.Token);
+        var act = () => backend.WriteAsync("archivo.txt", content, 100, DateTimeOffset.UtcNow, new Progress<TransferProgress>(), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         File.Exists(Path.Combine(_tempRoot.FullName, "archivo.txt.jmtmp")).Should().BeFalse();
@@ -317,7 +317,7 @@ public sealed class LocalStorageBackendTests : IDisposable
     private static async Task WriteAsync(LocalStorageBackend backend, string path, byte[] content)
     {
         using var stream = new MemoryStream(content);
-        await backend.WriteAsync(path, stream, content.Length, new Progress<TransferProgress>(), CancellationToken.None);
+        await backend.WriteAsync(path, stream, content.Length, DateTimeOffset.UtcNow, new Progress<TransferProgress>(), CancellationToken.None);
     }
 
     private static async Task<List<FileEntry>> CollectAsync(LocalStorageBackend backend, string path, bool recursive)

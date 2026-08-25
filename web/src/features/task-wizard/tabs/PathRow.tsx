@@ -16,6 +16,8 @@ const REASON_KEYS = {
   PermissionDenied: 'reasonPermissionDenied',
   PathNotFound: 'reasonPathNotFound',
   InvalidCredentials: 'reasonInvalidCredentials',
+  UntrustedCertificate: 'reasonUntrustedCertificate',
+  UnknownHostKey: 'reasonUnknownHostKey',
 } as const
 
 interface PathRowProps {

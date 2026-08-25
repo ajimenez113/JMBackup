@@ -166,8 +166,11 @@ public sealed class LocalStorageBackend : IStorageBackend
         }
     }
 
+    // sourceModifiedUtc es para reanudación (ADR-027): este backend siempre trunca
+    // con el truco .jmtmp de más abajo, nunca reanuda un parcial, así que no la usa.
     public async Task WriteAsync(
-        string path, Stream content, long size, IProgress<TransferProgress> progress, CancellationToken cancellationToken)
+        string path, Stream content, long size, DateTimeOffset sourceModifiedUtc, IProgress<TransferProgress> progress,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(progress);

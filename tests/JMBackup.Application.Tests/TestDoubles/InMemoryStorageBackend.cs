@@ -112,8 +112,11 @@ public sealed class InMemoryStorageBackend(TimeProvider timeProvider) : IStorage
     }
 
     public async Task WriteAsync(
-        string path, Stream content, long size, IProgress<TransferProgress> progress, CancellationToken cancellationToken)
+        string path, Stream content, long size, DateTimeOffset sourceModifiedUtc, IProgress<TransferProgress> progress,
+        CancellationToken cancellationToken)
     {
+        _ = sourceModifiedUtc; // Este doble no reanuda parciales; ver ADR-027.
+
         var key = Normalize(path);
 
         if (_writeFailures.TryGetValue(key, out var queue) && queue.Count > 0)

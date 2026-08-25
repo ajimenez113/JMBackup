@@ -262,7 +262,7 @@ public sealed class BackupEngine(
                 var sourceStream = await sourceBackend.OpenReadAsync(item.SourceRelativePath, token).ConfigureAwait(false);
                 await using (sourceStream.ConfigureAwait(false))
                 {
-                    await destinationBackend.WriteAsync(item.RelativePath, sourceStream, item.Size, fileProgress, token).ConfigureAwait(false);
+                    await destinationBackend.WriteAsync(item.RelativePath, sourceStream, item.Size, item.ModifiedUtc, fileProgress, token).ConfigureAwait(false);
                 }
             }, fileCancellation.Token).ConfigureAwait(false);
 

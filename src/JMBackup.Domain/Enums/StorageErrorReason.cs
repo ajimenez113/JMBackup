@@ -13,4 +13,10 @@ public enum StorageErrorReason
     PermissionDenied = 3,
     PathNotFound = 4,
     InvalidCredentials = 5,
+
+    /// <summary>FTPS: el certificado TLS del servidor no es de confianza (fase 5, hito 2).</summary>
+    UntrustedCertificate = 6,
+
+    /// <summary>SFTP: la huella del servidor no coincide con la registrada, o es la primera conexión sin confirmar (fase 5, hito 2).</summary>
+    UnknownHostKey = 7,
 }

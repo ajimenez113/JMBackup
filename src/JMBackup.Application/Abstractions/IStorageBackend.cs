@@ -35,10 +35,19 @@ public interface IStorageBackend : IAsyncDisposable
 
     Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken);
 
+    /// <param name="sourceModifiedUtc">
+    /// Fecha de modificación del origen en el momento de este intento (ADR-027). Los
+    /// backends remotos que reanudan transferencias parciales (FTP con <c>REST</c>,
+    /// S3 con multipart) la usan para validar que el origen no cambió desde el
+    /// intento anterior antes de reanudar — si no coincide con la registrada, el
+    /// parcial se descarta y la transferencia arranca de cero.
+    /// <c>LocalStorageBackend</c> la ignora: nunca reanuda.
+    /// </param>
     Task WriteAsync(
         string path,
         Stream content,
         long size,
+        DateTimeOffset sourceModifiedUtc,
         IProgress<TransferProgress> progress,
         CancellationToken cancellationToken);
 

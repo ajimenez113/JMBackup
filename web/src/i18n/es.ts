@@ -224,6 +224,8 @@ export const es = {
       reasonPermissionDenied: 'Permiso denegado.',
       reasonPathNotFound: 'La ruta no existe.',
       reasonInvalidCredentials: 'Credenciales inválidas.',
+      reasonUntrustedCertificate: 'El certificado del servidor no es de confianza.',
+      reasonUnknownHostKey: 'La huella del servidor no coincide con la registrada.',
       credentialLabel: 'Credencial',
       credentialNone: 'Sin credencial',
       credentialNew: 'Nueva credencial…',
