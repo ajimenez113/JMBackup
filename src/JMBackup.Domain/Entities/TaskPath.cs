@@ -16,5 +16,8 @@ public sealed class TaskPath
 
     public int? CredentialId { get; set; }
 
+    /// <summary>Solo aplica a <see cref="Enums.BackendType.Ftp"/>: FTPS explícito si es <c>true</c>, FTP sin cifrar si es <c>false</c>.</summary>
+    public bool Encrypted { get; set; }
+
     public int Position { get; set; }
 }

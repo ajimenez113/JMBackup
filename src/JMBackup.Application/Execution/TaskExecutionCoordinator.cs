@@ -87,12 +87,22 @@ public sealed class TaskExecutionCoordinator(
 
             foreach (var path in paths)
             {
+                Credential? credential = null;
                 if (path.CredentialId is { } credentialId)
                 {
-                    await ConnectShareAsync(path.Path, credentialId, connectedShares, linkedCancellation.Token).ConfigureAwait(false);
+                    credential = await credentialRepository.FindAsync(credentialId, linkedCancellation.Token).ConfigureAwait(false);
+
+                    // Local/UNC no recibe la credencial: la conexión se resuelve a nivel
+                    // de sistema operativo (WNetAddConnection2), no adentro del backend.
+                    // Los backends remotos sí la necesitan para autenticarse ellos mismos.
+                    if (path.BackendType == BackendType.Local && credential is not null)
+                    {
+                        ConnectShare(path.Path, credential, connectedShares);
+                        credential = null;
+                    }
                 }
 
-                var backend = backendFactory.Create(path.BackendType, path.Path);
+                var backend = backendFactory.Create(path, credential);
                 var target = path.Role == TaskPathRole.Source ? sourceBackends : destinationBackends;
                 target[path.Path] = backend;
             }
@@ -225,14 +235,8 @@ public sealed class TaskExecutionCoordinator(
         return items;
     }
 
-    private async Task ConnectShareAsync(string uncRoot, int credentialId, List<string> connectedShares, CancellationToken cancellationToken)
+    private void ConnectShare(string uncRoot, Credential credential, List<string> connectedShares)
     {
-        var credential = await credentialRepository.FindAsync(credentialId, cancellationToken).ConfigureAwait(false);
-        if (credential is null)
-        {
-            return;
-        }
-
         var password = credentialProtector.Unprotect(credential.EncryptedSecret);
         shareConnector.Connect(uncRoot, new System.Net.NetworkCredential(credential.Username, password));
         connectedShares.Add(uncRoot);

@@ -48,7 +48,7 @@ public sealed class TaskExecutionCoordinatorTests
 
         var disconnectedBackend = new InMemoryStorageBackend(timeProvider) { IsConnected = false };
         var backendFactory = Substitute.For<IStorageBackendFactory>();
-        backendFactory.Create(Arg.Any<BackendType>(), Arg.Any<string>()).Returns(disconnectedBackend);
+        backendFactory.Create(Arg.Any<TaskPath>(), Arg.Any<Credential?>()).Returns(disconnectedBackend);
 
         var coordinator = new TaskExecutionCoordinator(
             taskRepository,

@@ -76,11 +76,22 @@ tarde de forma confusa.
 ```powershell
 dotnet build JMBackup.sln
 dotnet format JMBackup.sln --verify-no-changes
-dotnet test JMBackup.sln
+dotnet test JMBackup.sln --filter "Category!=Docker"
 ```
 
 Los tres deben terminar sin advertencias ni errores antes de dar por cerrada
 cualquier fase (`TreatWarningsAsErrors` está activado en toda la solución).
+
+Las pruebas de destinos remotos (fase 5, hito 2) contra un servidor real en
+contenedor (FTP, LocalStack para S3) están marcadas `[Trait("Category", "Docker")]` y
+quedan afuera de ese filtro a propósito: sin Docker corriendo, Testcontainers no falla
+rápido al intentar levantar el contenedor — se queda esperando indefinidamente en vez
+de fallar, colgando toda la corrida. Con Docker Desktop (o cualquier motor compatible)
+corriendo, ejecutalas aparte:
+
+```powershell
+dotnet test JMBackup.sln --filter "Category=Docker"
+```
 
 ## Usar el motor desde la línea de comandos
 

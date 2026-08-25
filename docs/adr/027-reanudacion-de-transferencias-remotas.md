@@ -67,15 +67,19 @@ le corresponde.
 
 ## Consecuencias
 
-- **Costo de la relectura del origen cuando no es local.** Saltar bytes ya
-  transferidos es gratis sobre un disco local (`Stream.Seek` no toca la red). Sobre un
-  origen de red — un recurso UNC, o cualquier backend remoto que el hito 2 agregue como
-  origen más adelante — `Seek` puede estar técnicamente disponible, pero el propio
-  protocolo (SMB, FTP, SFTP) igual transmite esos bytes por la red para posicionarse:
-  se retransmite el origen, aunque nunca se retransmita al destino (que suele ser el
-  enlace más caro o más lento). Es una compensación aceptada, no un defecto: reanudar
-  ahorra el lado caro (subir de nuevo a S3/FTP) a costa del lado barato (releer del
-  origen).
+- **Costo de la relectura del origen cuando no soporta posicionamiento real.** Saltar
+  bytes ya transferidos es gratis sobre disco local y también sobre un recurso UNC:
+  `FileStream.Seek` funciona igual en los dos casos, y SMB2/3 soporta lectura por
+  posición (`Read` desde un offset) sin transmitir de nuevo lo salteado — no es una
+  aproximación, es cómo funciona el protocolo. Los orígenes de la fase 5 (local y UNC)
+  son siempre así, así que reanudar hoy no tiene costo extra del lado del origen. La
+  advertencia real es para el día que un backend remoto sea también **origen** (fuera
+  del alcance de esta fase): si ese backend expone la lectura como un `Stream` de solo
+  avance, sin soporte real de `Seek`, saltar bytes ahí sí exige leerlos y
+  descartarlos, consumiendo ancho de banda del origen para no retransmitir al
+  destino (que suele ser el enlace más caro o más lento). `SkipBytes` ya contempla
+  los dos casos (`Stream.CanSeek` primero, lectura-y-descarte si no), para que ese
+  día no haga falta tocar esta lógica.
 - `ResumeDecision` necesita una prueba que reproduzca exactamente el caso de
   seguridad: parcial existente + origen con tamaño o fecha distintos → no reanuda,
   arranca de cero. Esa prueba es la que de verdad protege contra el "peor fallo

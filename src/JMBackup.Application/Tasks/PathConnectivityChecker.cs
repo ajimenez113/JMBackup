@@ -1,6 +1,7 @@
 using System.Net;
 using JMBackup.Application.Abstractions;
 using JMBackup.Domain.Entities;
+using JMBackup.Domain.Enums;
 
 namespace JMBackup.Application.Tasks;
 
@@ -19,20 +20,24 @@ public sealed class PathConnectivityChecker(
             credential = await credentialRepository.FindAsync(credentialId, cancellationToken).ConfigureAwait(false);
         }
 
-        if (credential is not null)
+        // Local/UNC conecta el recurso a nivel de sistema operativo y no le pasa la
+        // credencial al backend; los backends remotos se autentican ellos mismos con
+        // ella (ver TaskExecutionCoordinator, misma regla).
+        var isUncCredential = path.BackendType == BackendType.Local && credential is not null;
+        if (isUncCredential)
         {
-            var password = credentialProtector.Unprotect(credential.EncryptedSecret);
+            var password = credentialProtector.Unprotect(credential!.EncryptedSecret);
             shareConnector.Connect(path.Path, new NetworkCredential(credential.Username, password));
         }
 
         try
         {
-            await using var backend = backendFactory.Create(path.BackendType, path.Path);
+            await using var backend = backendFactory.Create(path, isUncCredential ? null : credential);
             return await backend.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            if (credential is not null)
+            if (isUncCredential)
             {
                 shareConnector.Disconnect(path.Path);
             }
