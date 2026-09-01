@@ -18,6 +18,9 @@ TestResults/
 # Publicación
 publish/
 
+# Instalador compilado (Inno Setup)
+build/dist/
+
 # Herramientas de usuario de Visual Studio / Rider
 *.user
 *.suo

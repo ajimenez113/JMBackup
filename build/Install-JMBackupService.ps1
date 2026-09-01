@@ -169,7 +169,14 @@ New-Service -Name $ServiceName `
     -Description "Servicio de respaldo JMBackup (motor de copia, API HTTPS y planificación)." `
     -StartupType Automatic `
     -Credential $credential | Out-Null
-Write-Host "Servicio '$ServiceName' registrado, apuntando a '$exePath'."
+
+# New-Service no tiene forma de pedir arranque automático *retrasado* directamente
+# (solo Automatic/Manual/Disabled) — se ajusta aparte con sc.exe. El retraso evita que
+# el servicio compita por E/S de disco con el resto de lo que arranca al iniciar
+# sesión Windows, además de darle tiempo a que la red esté lista antes de que el
+# motor intente conectarse a recursos UNC.
+& sc.exe config $ServiceName start= delayed-auto | Out-Null
+Write-Host "Servicio '$ServiceName' registrado (arranque automático retrasado), apuntando a '$exePath'."
 
 # 4. Regla de firewall entrante. Se limita a Dominio/Privada: exponer el respaldo a
 #    una red Pública queda fuera del comportamiento "seguro por defecto" del
