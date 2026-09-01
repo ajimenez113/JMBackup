@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Publica JMBackup y compila el instalador de Inno Setup.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instala JMBackup como servicio de Windows.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Firma con Authenticode los ejecutables publicados y el instalador, si hay un
     certificado de firma de código configurado (RNF-06).

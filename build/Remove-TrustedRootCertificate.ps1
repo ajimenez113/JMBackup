@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Quita del almacén Trusted Root el certificado de JMBackup instalado por
     `Install-TrustedRootCertificate.ps1`, si lo hay.

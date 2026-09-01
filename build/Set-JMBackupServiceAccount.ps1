@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Cambia la cuenta con la que corre el servicio JMBackup a una cuenta de usuario ya
     existente, en vez de la cuenta dedicada que crea Install-JMBackupService.ps1.

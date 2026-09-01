@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instala la parte pública del certificado autofirmado de JMBackup en el almacén de
     entidades de certificación raíz de confianza del equipo (Trusted Root).

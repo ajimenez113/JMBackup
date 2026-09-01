@@ -5,11 +5,12 @@ carpetas entre equipos por red. Corre como servicio de Windows en segundo plano 
 controla desde una interfaz web (HTTPS) o desde una aplicación de escritorio que
 envuelve esa misma interfaz.
 
-Este repositorio está construyendo el **hito 1**: motor de copia local y SMB/UNC,
-planificación horaria, servicio de Windows, interfaz web e interfaz de escritorio. Lo
-que no entra en el hito 1 (FTP, SFTP, S3, emparejamiento entre equipos, acciones
-pre/post, correo, comparación tricolor, VSS, instalador) está documentado pero no
-implementado; ver `docs/00-ESPECIFICACION.md` y `docs/02-ROADMAP-HITO1.md`.
+El **hito 1** (fases 0 a 4: motor de copia local y SMB/UNC, planificación horaria,
+servicio de Windows, interfaz web e interfaz de escritorio) está completo. El
+**hito 2** está en marcha: destinos remotos (FTP construido; SFTP y S3, pendientes),
+planificación avanzada, acciones pre/post, tiempo real, multiequipo, correo,
+comparación tricolor y empaquetado — ver `docs/03-ROADMAP-HITO2.md` para el detalle
+fase por fase y qué está listo.
 
 ## Documentación del proyecto
 
@@ -19,7 +20,13 @@ implementado; ver `docs/00-ESPECIFICACION.md` y `docs/02-ROADMAP-HITO1.md`.
 | `docs/00-ESPECIFICACION.md` | Qué debe hacer la aplicación |
 | `docs/01-ARQUITECTURA.md` | Cómo está estructurada y por qué (incluye los ADR) |
 | `docs/02-ROADMAP-HITO1.md` | Plan de las fases 0 a 4 |
+| `docs/03-ROADMAP-HITO2.md` | Plan de las fases 5 a 9 |
+| `docs/04-GUIA-INSTALACION.md` | Instalación con el instalador de Inno Setup |
+| `docs/05-RESOLUCION-DE-PROBLEMAS.md` | Casos reales y su solución |
+| `docs/06-API.md` | Referencia de la API, generada desde OpenAPI |
+| `docs/manual-usuario/` | Manual de usuario, con capturas |
 | `docs/adr/` | Decisiones técnicas adicionales, una por archivo |
+| `CHANGELOG.md` | Historial de versiones |
 
 ## Requisitos
 
