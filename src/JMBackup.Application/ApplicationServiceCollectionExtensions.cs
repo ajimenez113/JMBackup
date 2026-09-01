@@ -1,6 +1,7 @@
 using JMBackup.Application.Execution;
 using JMBackup.Application.Settings;
 using JMBackup.Application.Tasks;
+using JMBackup.Application.Updates;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JMBackup.Application;
@@ -12,5 +13,6 @@ public static class ApplicationServiceCollectionExtensions
         .AddScoped<SettingsService>()
         .AddScoped<TaskService>()
         .AddScoped<PathConnectivityChecker>()
-        .AddScoped<TaskExecutionCoordinator>();
+        .AddScoped<TaskExecutionCoordinator>()
+        .AddScoped<UpdateCheckService>();
 }

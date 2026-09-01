@@ -22,7 +22,7 @@ public sealed record CertificateInfoResponse(string Subject, string Thumbprint, 
 /// <summary>RF-111: si el puerto pedido está ocupado, se informa acá y se sugiere el siguiente libre.</summary>
 public sealed record PortAvailabilityResponse(bool IsAvailable, int? SuggestedPort);
 
-public sealed record GeneralSettingsRequest(string Theme, bool StartWithWindows, int HistoryRetentionDays);
+public sealed record GeneralSettingsRequest(string Theme, bool StartWithWindows, int HistoryRetentionDays, string? UpdateCheckUrl);
 
 public sealed record TransferSettingsRequest(
     int MaxParallelTransfers, long? GlobalBandwidthLimitBytesPerSecond, int BlockSizeBytes, bool PreserveTimestampsAndAttributes);

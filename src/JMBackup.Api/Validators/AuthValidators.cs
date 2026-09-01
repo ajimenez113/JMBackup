@@ -48,6 +48,10 @@ public sealed class GeneralSettingsRequestValidator : AbstractValidator<GeneralS
     public GeneralSettingsRequestValidator()
     {
         RuleFor(request => request.HistoryRetentionDays).GreaterThanOrEqualTo(1);
+        RuleFor(request => request.UpdateCheckUrl)
+            .Must(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            .WithMessage("La URL de comprobación de actualizaciones debe ser una URL http o https válida.")
+            .When(request => !string.IsNullOrWhiteSpace(request.UpdateCheckUrl));
     }
 }
 

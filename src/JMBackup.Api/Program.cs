@@ -16,6 +16,7 @@ using JMBackup.Infrastructure.Persistence;
 using JMBackup.Infrastructure.Persistence.Repositories;
 using JMBackup.Infrastructure.Scheduling;
 using JMBackup.Infrastructure.Security;
+using JMBackup.Infrastructure.Updates;
 using JMBackup.Storage;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -90,6 +91,7 @@ builder.Services.AddSingleton<IProgressPublisher, SignalRProgressPublisher>();
 builder.Services.AddSingleton<LoginAttemptThrottle>();
 builder.Services.AddScoped<IAuthorizationHandler, CredentialRequirementHandler>();
 builder.Services.AddSingleton<PathValidationService>();
+builder.Services.AddHttpClient<IUpdateCheckClient, HttpUpdateCheckClient>();
 
 // FluentValidation 12 ya no trae el registro automático por ensamblado
 // (era un paquete aparte, FluentValidation.DependencyInjectionExtensions); se
@@ -183,6 +185,7 @@ app.MapControlEndpoints();
 app.MapRunEndpoints();
 app.MapLogEndpoints();
 app.MapSettingsEndpoints();
+app.MapVersionEndpoints();
 
 app.MapHub<ProgressHub>("/hubs/progress");
 app.MapOpenApi();

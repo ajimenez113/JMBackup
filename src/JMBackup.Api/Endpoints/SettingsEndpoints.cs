@@ -62,13 +62,19 @@ public static class SettingsEndpoints
         group.MapGet("/general", async (SettingsService settings, CancellationToken ct) =>
         {
             var value = await settings.GetGeneralAsync(ct).ConfigureAwait(false);
-            return Results.Ok(new GeneralSettingsRequest(value.Theme, value.StartWithWindows, value.HistoryRetentionDays));
+            return Results.Ok(new GeneralSettingsRequest(value.Theme, value.StartWithWindows, value.HistoryRetentionDays, value.UpdateCheckUrl));
         }).Produces<GeneralSettingsRequest>();
 
         group.MapPut("/general", async (GeneralSettingsRequest request, SettingsService settings, CancellationToken ct) =>
         {
             await settings.SetGeneralAsync(
-                new GeneralSettings { Theme = request.Theme, StartWithWindows = request.StartWithWindows, HistoryRetentionDays = request.HistoryRetentionDays },
+                new GeneralSettings
+                {
+                    Theme = request.Theme,
+                    StartWithWindows = request.StartWithWindows,
+                    HistoryRetentionDays = request.HistoryRetentionDays,
+                    UpdateCheckUrl = request.UpdateCheckUrl,
+                },
                 ct).ConfigureAwait(false);
             return Results.Ok();
         }).WithValidation<GeneralSettingsRequest>();
@@ -186,7 +192,7 @@ public static class SettingsEndpoints
         var configuration = new ExportedConfiguration(
             new SecuritySettingsResponse(security.Username, security.RequireCredentialFor.ToString(), security.SessionInactivityMinutes, security.AllowUnauthenticatedLan),
             new WebSettingsRequest(web.ListenAddress, web.Port),
-            new GeneralSettingsRequest(general.Theme, general.StartWithWindows, general.HistoryRetentionDays),
+            new GeneralSettingsRequest(general.Theme, general.StartWithWindows, general.HistoryRetentionDays, general.UpdateCheckUrl),
             new TransferSettingsRequest(transfer.MaxParallelTransfers, transfer.GlobalBandwidthLimitBytesPerSecond, transfer.BlockSizeBytes, transfer.PreserveTimestampsAndAttributes),
             exportedTasks);
 
@@ -199,7 +205,13 @@ public static class SettingsEndpoints
     {
         await settings.SetWebAsync(new WebSettings { ListenAddress = configuration.Web.ListenAddress, Port = configuration.Web.Port }, cancellationToken).ConfigureAwait(false);
         await settings.SetGeneralAsync(
-            new GeneralSettings { Theme = configuration.General.Theme, StartWithWindows = configuration.General.StartWithWindows, HistoryRetentionDays = configuration.General.HistoryRetentionDays },
+            new GeneralSettings
+            {
+                Theme = configuration.General.Theme,
+                StartWithWindows = configuration.General.StartWithWindows,
+                HistoryRetentionDays = configuration.General.HistoryRetentionDays,
+                UpdateCheckUrl = configuration.General.UpdateCheckUrl,
+            },
             cancellationToken).ConfigureAwait(false);
         await settings.SetTransferAsync(new TransferSettings
         {

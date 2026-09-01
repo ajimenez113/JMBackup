@@ -16,6 +16,7 @@ export function GeneralSettingsTab() {
   const [theme, setTheme] = useState('System')
   const [startWithWindows, setStartWithWindows] = useState(true)
   const [historyRetentionDays, setHistoryRetentionDays] = useState('90')
+  const [updateCheckUrl, setUpdateCheckUrl] = useState('')
   const [savedNotice, setSavedNotice] = useState(false)
 
   useEffect(() => {
@@ -26,10 +27,16 @@ export function GeneralSettingsTab() {
     setTheme(data.theme)
     setStartWithWindows(data.startWithWindows)
     setHistoryRetentionDays(String(data.historyRetentionDays))
+    setUpdateCheckUrl(data.updateCheckUrl ?? '')
   }, [data])
 
   async function handleSave() {
-    await save({ theme, startWithWindows, historyRetentionDays: Number(historyRetentionDays) })
+    await save({
+      theme,
+      startWithWindows,
+      historyRetentionDays: Number(historyRetentionDays),
+      updateCheckUrl: updateCheckUrl.trim() === '' ? undefined : updateCheckUrl.trim(),
+    })
     setSavedNotice(true)
   }
 
@@ -80,6 +87,16 @@ export function GeneralSettingsTab() {
         value={historyRetentionDays}
         onChange={(event) => setHistoryRetentionDays(event.target.value)}
       />
+      <div>
+        <Input
+          type="url"
+          label={strings.settings.general.updateCheckUrl}
+          value={updateCheckUrl}
+          onChange={(event) => setUpdateCheckUrl(event.target.value)}
+          placeholder="https://..."
+        />
+        <p className="mt-1 text-xs text-fg-muted">{strings.settings.general.updateCheckUrlHint}</p>
+      </div>
 
       <div className="flex items-center gap-2">
         <Button variant="primary" disabled={isSaving} onClick={() => void handleSave()}>

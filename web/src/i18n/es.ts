@@ -83,6 +83,13 @@ export const es = {
     license: 'Licencia',
     credits: 'Créditos',
     webLink: 'Abrir la interfaz web local',
+    checkForUpdates: 'Buscar actualizaciones',
+    checkingForUpdates: 'Buscando…',
+    updatesNotConfigured: 'La comprobación de actualizaciones no está configurada (Configuración → General).',
+    upToDate: 'Ya tenés la última versión.',
+    updateAvailable: 'Hay una versión nueva disponible',
+    updateDownloadLink: 'Ver la versión nueva',
+    checkFailed: 'No se pudo comprobar actualizaciones.',
   },
   settings: {
     title: 'Configuración',
@@ -99,6 +106,9 @@ export const es = {
       exportConfig: 'Exportar configuración',
       importConfig: 'Importar configuración',
       importConfirm: '¿Importar esta configuración? Reemplaza la actual y agrega las tareas del archivo.',
+      updateCheckUrl: 'URL de comprobación de actualizaciones (opcional)',
+      updateCheckUrlHint:
+        'Vacío por defecto: sin URL, "Acerca de" no busca actualizaciones. Si publicás tu propio JSON ({ "version": "1.2.0", "url": "..." }) en algún lado, completá su URL acá.',
     },
     transfer: {
       maxParallelTransfers: 'Transferencias en paralelo',
