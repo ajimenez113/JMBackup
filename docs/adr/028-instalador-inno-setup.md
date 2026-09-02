@@ -87,3 +87,33 @@ Con esas dos correcciones, `.\build\Build-Installer.ps1` generó
 `build\dist\JMBackup-Setup-1.0.0.exe` (87 MB) sin errores. Falta probarlo
 *ejecutándolo* de verdad en un equipo limpio — compilar sin errores no prueba que la
 instalación en sí funcione.
+
+### Actualización — primera instalación real: falta el WebView2 Runtime (2026-09-02)
+
+La primera vez que se instaló de verdad en otro equipo, la app de escritorio mostraba
+"Buscando el servicio…" y se cerraba sola, sin abrir ninguna ventana. Causa raíz
+doble:
+
+1. `App.xaml.cs` no tenía ningún manejador de excepciones no atrapadas — cualquier
+   error durante el arranque (el `Loaded` de `MainWindow` es, en la práctica, un
+   `async void`) cerraba el proceso en silencio, sin mensaje ni rastro.
+2. El equipo destino no tenía instalado el **WebView2 Runtime** de Microsoft Edge
+   (modelo "Evergreen": el control .NET viaja en el ejecutable, pero el motor de
+   renderizado lo tiene que dar el sistema operativo). Falta por defecto en Windows
+   Server, aunque casi siempre está en Windows 10/11 de escritorio por traer Edge.
+   `EnsureCoreWebView2Async()` tira `WebView2RuntimeNotFoundException` sin atrapar —
+   exactamente la excepción que el punto 1 dejaba morir en silencio.
+
+Corregido en tres capas: `App.xaml.cs` ahora muestra cualquier excepción no atrapada
+en un cuadro de diálogo real en vez de cerrar en silencio;
+`MainWindow.IsWebView2RuntimeAvailable()` chequea el runtime ANTES de intentar usarlo
+y muestra un mensaje claro con el enlace de descarga si falta; y el propio instalador
+(`IsWebView2RuntimeInstalled` en `JMBackup.iss`) avisa al terminar de instalar si el
+equipo no lo tiene, para que se sepa antes de intentar abrir la app. Documentado
+también en `docs/05-RESOLUCION-DE-PROBLEMAS.md`.
+
+No se agregó una instalación silenciosa automática del runtime durante el setup
+(bajarlo y correrlo con `/silent` desde Inno Setup) — hubiera hecho falta acceso a
+red durante la instalación y no se pudo probar esa ruta en este entorno. Si hace
+falta más adelante, `IsWebView2RuntimeInstalled` ya deja el punto exacto donde
+engancharlo.

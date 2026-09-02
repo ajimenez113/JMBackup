@@ -3,6 +3,29 @@
 Casos reales encontrados durante el desarrollo y uso de JMBackup, con su causa y su
 solución.
 
+## La aplicación de escritorio muestra "Buscando el servicio…" y se cierra sola
+
+**Síntoma:** al abrir JMBackup, aparece brevemente el texto de arranque y después la
+ventana se cierra, sin mostrar ningún error ni abrir la interfaz.
+
+**Causa:** falta el **WebView2 Runtime** de Microsoft Edge en ese equipo. La app de
+escritorio lo necesita para mostrar su interfaz — viene instalado por defecto en
+Windows 11 y en la mayoría de instalaciones de Windows 10 (por traer Edge), pero
+**no en Windows Server** ni en instalaciones mínimas. Antes de la corrección de esta
+sección, JMBackup no verificaba esto y se cerraba en silencio en vez de avisar.
+
+**Solución:**
+
+1. Descargá e instalá el WebView2 Runtime desde
+   `https://go.microsoft.com/fwlink/p/?LinkId=2124703` (instalador oficial de
+   Microsoft, ~2 MB).
+2. Volvé a abrir JMBackup.
+
+El instalador de JMBackup ya avisa si falta al terminar de instalar; si igual no lo
+viste o instalaste JMBackup a mano, seguí los dos pasos de arriba. Mientras tanto, la
+interfaz web (`https://<equipo>:8483` desde un navegador) funciona igual sin este
+componente — solo lo necesita la app de escritorio.
+
 ## El servicio no tiene acceso a un recurso de red (SMB/UNC)
 
 **Síntoma:** una tarea con una ruta de red (`\\SERVIDOR\recurso`) falla con

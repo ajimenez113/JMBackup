@@ -44,6 +44,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!IsWebView2RuntimeAvailable())
+        {
+            StartupText.Text = "Falta instalar el WebView2 Runtime de Microsoft Edge en este equipo.\n" +
+                "Descargalo desde https://go.microsoft.com/fwlink/p/?LinkId=2124703 e instalalo,\n" +
+                "después volvé a abrir JMBackup.";
+            return;
+        }
+
         StartupText.Text = "Cargando la interfaz…";
         await WebView.EnsureCoreWebView2Async();
         ConfigureCoreWebView2(WebView.CoreWebView2);
@@ -106,6 +114,29 @@ public partial class MainWindow : Window
         }
 
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// JMBackup usa el modelo "Evergreen" de WebView2 (<c>Microsoft.Web.WebView2</c> sin
+    /// <c>FixedVersion</c>): el control .NET viaja en el ejecutable, pero el motor de
+    /// renderizado en sí lo tiene que tener instalado el sistema operativo. Viene con
+    /// Windows 11 y con Edge en la mayoría de instalaciones de Windows 10, pero NO con
+    /// Windows Server por defecto — sin este chequeo explícito,
+    /// <c>EnsureCoreWebView2Async</c> tira <c>WebView2RuntimeNotFoundException</c> sin
+    /// atrapar, adentro de un manejador de evento <c>async void</c>, lo que cierra toda
+    /// la aplicación sin abrir ninguna ventana ni mostrar ningún mensaje.
+    /// </summary>
+    private static bool IsWebView2RuntimeAvailable()
+    {
+        try
+        {
+            Microsoft.Web.WebView2.Core.CoreWebView2Environment.GetAvailableBrowserVersionString();
+            return true;
+        }
+        catch (Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException)
+        {
+            return false;
+        }
     }
 
     private static async Task<bool> IsLockRequiredAsync()

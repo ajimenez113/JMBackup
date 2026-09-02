@@ -110,6 +110,25 @@ var
   TrustCertPage: TWizardPage;
   TrustCertCheckBox: TNewCheckBox;
 
+// La app de escritorio usa el modelo "Evergreen" de WebView2: el motor de
+// renderizado lo tiene que tener instalado el sistema operativo (viene con Windows
+// 11 y con Edge en la mayoría de Windows 10, pero NO con Windows Server por
+// defecto). Sin él, JMBackup.Desktop.exe se cierra apenas se abre — este chequeo
+// avisa ANTES de terminar la instalación, en vez de que la persona lo descubra recién
+// al intentar abrir la app. El motor de copia y la interfaz web no lo necesitan: solo
+// afecta a la app de escritorio, así que es un aviso, no un bloqueo de la instalación.
+function IsWebView2RuntimeInstalled: Boolean;
+var
+  Version: String;
+  ClientKeySuffix: String;
+begin
+  ClientKeySuffix := '\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  Result :=
+    RegQueryStringValue(HKLM64, 'SOFTWARE\WOW6432Node' + ClientKeySuffix, 'pv', Version)
+    or RegQueryStringValue(HKLM64, 'SOFTWARE' + ClientKeySuffix, 'pv', Version)
+    or RegQueryStringValue(HKCU, 'SOFTWARE' + ClientKeySuffix, 'pv', Version);
+end;
+
 procedure InitializeWizard;
 var
   ExplanationLabel: TNewStaticText;
@@ -150,6 +169,20 @@ end;
 function ShouldTrustCertificate: Boolean;
 begin
   Result := TrustCertCheckBox.Checked;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssPostInstall) and not IsWebView2RuntimeInstalled then
+  begin
+    MsgBox(
+      'JMBackup se instaló, pero este equipo no tiene el WebView2 Runtime de ' +
+      'Microsoft Edge — lo necesita la aplicación de escritorio para mostrar su ' +
+      'interfaz (la interfaz web por navegador funciona igual sin él).' + #13#10#13#10 +
+      'Instalalo desde https://go.microsoft.com/fwlink/p/?LinkId=2124703 antes de ' +
+      'abrir JMBackup desde el acceso directo.',
+      mbInformation, MB_OK);
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
