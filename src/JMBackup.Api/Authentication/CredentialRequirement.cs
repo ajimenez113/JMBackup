@@ -29,8 +29,14 @@ public sealed class CredentialRequirementHandler(SettingsService settingsService
     {
         var security = await settingsService.GetSecurityAsync(CancellationToken.None).ConfigureAwait(false);
 
+        // El header por sí solo no prueba nada: cualquiera puede mandarlo. El shell
+        // WPF SIEMPRE habla contra 127.0.0.1 (ADR-007) — nunca contra la dirección LAN
+        // que Kestrel abre cuando hay credencial configurada — así que exigir además
+        // que la conexión sea de loopback cierra la posibilidad de que alguien en la
+        // red simplemente agregue el header y se haga pasar por la app de escritorio.
         var isDesktopClient = context.Resource is HttpContext httpContext
-            && httpContext.Request.Headers[DesktopClientHeaderName] == DesktopClientHeaderValue;
+            && httpContext.Request.Headers[DesktopClientHeaderName] == DesktopClientHeaderValue
+            && System.Net.IPAddress.IsLoopback(httpContext.Connection.RemoteIpAddress ?? System.Net.IPAddress.None);
 
         var requiresAuth = security.RequireCredentialFor switch
         {

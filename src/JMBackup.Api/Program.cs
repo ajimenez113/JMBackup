@@ -187,7 +187,7 @@ app.MapLogEndpoints();
 app.MapSettingsEndpoints();
 app.MapVersionEndpoints();
 
-app.MapHub<ProgressHub>("/hubs/progress");
+app.MapHub<ProgressHub>("/hubs/progress").RequireAuthorization();
 app.MapOpenApi();
 
 // Interfaz web (fase 3): wwwroot lo escribe "npm run build" (vite.config.ts).
