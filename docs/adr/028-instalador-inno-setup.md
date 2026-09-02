@@ -53,10 +53,37 @@ existente desde `[Run]` mantiene una sola fuente de verdad: quien instale a mano
 
 - El instalador depende de que PowerShell esté disponible en el equipo destino
   (lo está por defecto en todo Windows 10/11 soportado por RNF-01).
-- No pude compilar `JMBackup.iss` con ISCC en este entorno porque Inno Setup no está
-  instalado acá — el script sigue la sintaxis documentada de Inno Setup 6, pero
-  **necesita una compilación real** (`build\Build-Installer.ps1`, o `iscc` a mano)
-  para confirmar que no tiene errores de Pascal Script antes de confiar en él.
 - Si en el futuro cambia el nombre del ejecutable publicado o la carpeta de
   publicación, hay que actualizar tanto el README como `[Files]` de `JMBackup.iss` —
   no hay una única fuente para esa ruta todavía.
+
+### Actualización — primera compilación real (2026-09-01)
+
+Con Inno Setup 7 instalado, `build\Build-Installer.ps1` compiló el instalador de
+verdad por primera vez. Salieron dos problemas reales que no se podían encontrar sin
+compilar:
+
+1. **`#13#10#13#10` al principio de una línea rompía el preprocesador de Inno
+   (ISPP)**: cualquier línea que empiece con `#`, incluso dentro de una concatenación
+   de Pascal Script, se interpreta como un intento de directiva de preprocesador
+   (`#define`, `#include`...) — no como el código de carácter que es. Se corrigió
+   uniendo esa concatenación a la línea anterior en vez de empezar una línea nueva
+   con `#13#10`.
+2. **`dotnet publish -o publish` chocaba con una instalación de desarrollo real**:
+   en esta misma máquina había un servicio de Windows corriendo con su binario en
+   `publish\JMBackup.Api.exe` (la carpeta que usa la instalación manual del README) —
+   `dotnet publish` no podía sobrescribirlo (`UnauthorizedAccessException`, el archivo
+   estaba en uso). Se cambió `Build-Installer.ps1` para publicar en `build\publish\`
+   en vez de `publish\` en la raíz, y `JMBackup.iss` para leer esa carpeta por un
+   parámetro (`MyPublishDir`, con `publish` como valor por defecto si alguien compila
+   el `.iss` a mano sin el script). Así compilar el instalador nunca depende de que no
+   haya ninguna instalación de desarrollo corriendo al mismo tiempo.
+
+También se generalizó la detección de Inno Setup en `Build-Installer.ps1`: buscaba
+específicamente la carpeta "Inno Setup 6", y no encontraba una instalación real de
+Inno Setup 7. Ahora busca cualquier carpeta "Inno Setup *" y toma la más nueva.
+
+Con esas dos correcciones, `.\build\Build-Installer.ps1` generó
+`build\dist\JMBackup-Setup-1.0.0.exe` (87 MB) sin errores. Falta probarlo
+*ejecutándolo* de verdad en un equipo limpio — compilar sin errores no prueba que la
+instalación en sí funcione.

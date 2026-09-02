@@ -3,15 +3,22 @@
 ; Compilar con:
 ;   iscc build\JMBackup.iss /DMyAppVersion=1.0.0
 ; o, más cómodo, con build\Build-Installer.ps1, que publica los dos ejecutables,
-; toma la versión de Directory.Build.props y llama a ISCC con ese valor.
+; toma la versión de Directory.Build.props y llama a ISCC con esa versión y la
+; carpeta de publicación correctas.
 ;
-; Requiere las carpetas publicadas junto a este script (ver README.md, "Compilar y
-; publicar manualmente"):
-;   ..\publish\           JMBackup.Api.exe (servicio) autocontenido
-;   ..\publish\desktop\   JMBackup.Desktop.exe autocontenido
+; Requiere las carpetas publicadas en MyPublishDir (por defecto build\publish, la
+; misma que usa Build-Installer.ps1 — deliberadamente NO la "publish\" de la raíz que
+; usa la instalación manual del README, para no chocar con un servicio de desarrollo
+; que ya esté corriendo desde ahí):
+;   MyPublishDir\           JMBackup.Api.exe (servicio) autocontenido
+;   MyPublishDir\desktop\   JMBackup.Desktop.exe autocontenido
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0-dev"
+#endif
+
+#ifndef MyPublishDir
+  #define MyPublishDir "publish"
 #endif
 
 #define MyAppName "JMBackup"
@@ -51,8 +58,8 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"
 
 [Files]
-Source: "..\publish\*"; DestDir: "{app}"; Excludes: "desktop\*"; Flags: recursesubdirs ignoreversion
-Source: "..\publish\desktop\*"; DestDir: "{app}\desktop"; Flags: recursesubdirs ignoreversion
+Source: "{#MyPublishDir}\*"; DestDir: "{app}"; Excludes: "desktop\*"; Flags: recursesubdirs ignoreversion
+Source: "{#MyPublishDir}\desktop\*"; DestDir: "{app}\desktop"; Flags: recursesubdirs ignoreversion
 Source: "Install-JMBackupService.ps1"; DestDir: "{app}\build"; Flags: ignoreversion
 Source: "Install-TrustedRootCertificate.ps1"; DestDir: "{app}\build"; Flags: ignoreversion
 Source: "Remove-TrustedRootCertificate.ps1"; DestDir: "{app}\build"; Flags: ignoreversion
@@ -122,8 +129,7 @@ begin
     'JMBackup genera su propio certificado para cifrar la conexión con su interfaz ' +
     'web. Al no estar firmado por una entidad reconocida, el navegador y la ' +
     'aplicación de escritorio van a mostrar una advertencia de conexión no segura la ' +
-    'primera vez que se usen — aunque la conexión ya está cifrada de todas formas.' +
-    #13#10#13#10 +
+    'primera vez que se usen — aunque la conexión ya está cifrada de todas formas.' + #13#10#13#10 +
     'Si marcás esta casilla, Windows va a confiar en ese certificado y la ' +
     'advertencia desaparece. Esto significa que el sistema va a aceptar como válida ' +
     'cualquier conexión HTTPS firmada con la clave de este certificado. Esa clave ' +

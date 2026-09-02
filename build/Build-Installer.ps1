@@ -64,14 +64,18 @@ function Find-Iscc {
         return $onPath.Source
     }
 
-    $wellKnownPaths = @(
-        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-        "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-    )
-    foreach ($candidate in $wellKnownPaths) {
-        if (Test-Path $candidate) {
-            return $candidate
-        }
+    # No se fija una versión: Inno Setup numera la carpeta de instalación por versión
+    # mayor ("Inno Setup 6", "Inno Setup 7", ...) y no hay forma de saber de antemano
+    # cuál tiene instalada quien corra esto. Se toma la más nueva que exista.
+    $searchRoots = @("${env:ProgramFiles(x86)}", "$env:ProgramFiles") | Where-Object { $_ }
+    $candidate = $searchRoots |
+        ForEach-Object { Get-ChildItem -Path $_ -Directory -Filter "Inno Setup *" -ErrorAction SilentlyContinue } |
+        Sort-Object Name -Descending |
+        ForEach-Object { Join-Path $_.FullName "ISCC.exe" } |
+        Where-Object { Test-Path $_ } |
+        Select-Object -First 1
+    if ($candidate) {
+        return $candidate
     }
 
     throw "No se encontró ISCC.exe (Inno Setup 6). Instalalo desde " +
@@ -93,21 +97,28 @@ function Invoke-Signing {
     & $signScript @signArgs
 }
 
+# Carpeta propia (build\publish\), distinta de la "publish\" de la raíz que usa la
+# instalación manual (README) — si esa carpeta tiene un servicio real corriendo desde
+# ahí (como en una máquina de desarrollo con JMBackup instalado a mano), su .exe queda
+# bloqueado y "dotnet publish" falla con acceso denegado. Con una carpeta separada,
+# compilar el instalador nunca choca con una instalación de desarrollo ya corriendo.
+$publishRoot = Join-Path $PSScriptRoot "publish"
+
 if (-not $SkipPublish) {
     Write-Host "Publicando JMBackup.Api (servicio)..."
     dotnet publish (Join-Path $repoRoot "src\JMBackup.Api") -c Release -r win-x64 --self-contained `
-        -p:PublishSingleFile=true -o (Join-Path $repoRoot "publish")
+        -p:PublishSingleFile=true -o $publishRoot
     if ($LASTEXITCODE -ne 0) { throw "Falló 'dotnet publish' de JMBackup.Api." }
 
     Write-Host "Publicando JMBackup.Desktop..."
     dotnet publish (Join-Path $repoRoot "src\JMBackup.Desktop") -c Release -r win-x64 --self-contained `
-        -p:PublishSingleFile=true -o (Join-Path $repoRoot "publish\desktop")
+        -p:PublishSingleFile=true -o (Join-Path $publishRoot "desktop")
     if ($LASTEXITCODE -ne 0) { throw "Falló 'dotnet publish' de JMBackup.Desktop." }
 }
 
 Invoke-Signing -Files @(
-    (Join-Path $repoRoot "publish\JMBackup.Api.exe"),
-    (Join-Path $repoRoot "publish\desktop\JMBackup.Desktop.exe")
+    (Join-Path $publishRoot "JMBackup.Api.exe"),
+    (Join-Path $publishRoot "desktop\JMBackup.Desktop.exe")
 )
 
 $version = Get-ProjectVersion
@@ -115,7 +126,7 @@ $iscc = Find-Iscc
 $issPath = Join-Path $PSScriptRoot "JMBackup.iss"
 
 Write-Host "Compilando el instalador (versión $version)..."
-& $iscc $issPath "/DMyAppVersion=$version"
+& $iscc $issPath "/DMyAppVersion=$version" "/DMyPublishDir=$publishRoot"
 if ($LASTEXITCODE -ne 0) { throw "Falló la compilación del instalador con ISCC." }
 
 $installerPath = Join-Path $PSScriptRoot "dist\JMBackup-Setup-$version.exe"
