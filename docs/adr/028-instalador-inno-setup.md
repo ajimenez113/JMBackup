@@ -117,3 +117,22 @@ No se agregó una instalación silenciosa automática del runtime durante el set
 red durante la instalación y no se pudo probar esa ruta en este entorno. Si hace
 falta más adelante, `IsWebView2RuntimeInstalled` ya deja el punto exacto donde
 engancharlo.
+
+### Actualización — segundo error real: WebView2 sin permiso de escritura (2026-09-02)
+
+Con el runtime ya instalado, la app llegaba a "Cargando la interfaz…" y ahí fallaba
+con `0x80070005 (E_ACCESSDENIED)`. Causa: `WebView.EnsureCoreWebView2Async()` sin
+argumentos usa el entorno por defecto, que crea su carpeta de datos de usuario al
+lado del propio ejecutable — en una instalación real eso es
+`C:\Program Files\JMBackup\desktop\`, donde una cuenta sin privilegios de
+administrador no tiene permiso de escritura.
+
+Corregido creando el entorno de WebView2 a mano
+(`MainWindow.CreateWebView2EnvironmentAsync`) con `userDataFolder` apuntando a
+`%LocalAppData%\JMBackup\WebView2` — la carpeta del perfil del usuario que abre la
+app, siempre escribible sin importar dónde esté instalado JMBackup.
+
+Con las tres correcciones de esta fase (manejo de excepciones, chequeo del runtime,
+carpeta de datos de usuario) el instalador se regeneró y compiló sin errores — falta
+confirmar que la app de escritorio abre correctamente con este instalador nuevo en la
+máquina real donde apareció el problema.

@@ -26,6 +26,22 @@ viste o instalaste JMBackup a mano, seguí los dos pasos de arriba. Mientras tan
 interfaz web (`https://<equipo>:8483` desde un navegador) funciona igual sin este
 componente — solo lo necesita la app de escritorio.
 
+## La aplicación de escritorio muestra "Acceso denegado (0x80070005 E_ACCESSDENIED)"
+
+**Síntoma:** al abrir JMBackup, llega hasta "Cargando la interfaz…" y ahí muestra un
+cuadro de error con el código `0x80070005 (E_ACCESSDENIED)`.
+
+**Causa:** WebView2 necesita una carpeta propia para guardar sus datos (caché,
+cookies), y antes intentaba crearla al lado del propio ejecutable —
+`C:\Program Files\JMBackup\desktop\` en una instalación normal—, donde una cuenta sin
+privilegios de administrador no tiene permiso de escritura.
+
+**Solución:** ya corregido — JMBackup ahora usa una carpeta en
+`%LocalAppData%\JMBackup\WebView2`, siempre escribible por el usuario que abre la
+app, sin importar dónde esté instalado JMBackup. Si ves este error, actualizá a una
+versión más nueva (o regenerá el instalador con `build\Build-Installer.ps1` si estás
+compilando vos mismo).
+
 ## El servicio no tiene acceso a un recurso de red (SMB/UNC)
 
 **Síntoma:** una tarea con una ruta de red (`\\SERVIDOR\recurso`) falla con

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Media;
@@ -53,7 +54,7 @@ public partial class MainWindow : Window
         }
 
         StartupText.Text = "Cargando la interfaz…";
-        await WebView.EnsureCoreWebView2Async();
+        await WebView.EnsureCoreWebView2Async(await CreateWebView2EnvironmentAsync());
         ConfigureCoreWebView2(WebView.CoreWebView2);
 
         _bridge = new NativeBridgeHandler(WebView.CoreWebView2, ExpectedOrigin);
@@ -130,13 +131,29 @@ public partial class MainWindow : Window
     {
         try
         {
-            Microsoft.Web.WebView2.Core.CoreWebView2Environment.GetAvailableBrowserVersionString();
+            CoreWebView2Environment.GetAvailableBrowserVersionString();
             return true;
         }
-        catch (Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException)
+        catch (WebView2RuntimeNotFoundException)
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Sin esto, WebView2 usa por defecto una carpeta de datos de usuario al lado del
+    /// propio ejecutable — que en una instalación normal es
+    /// <c>C:\Program Files\JMBackup\desktop\</c>, donde una cuenta sin privilegios de
+    /// administrador no tiene permiso de escritura. El síntoma real fue
+    /// "Acceso denegado (0x80070005 E_ACCESSDENIED)" al cargar la interfaz. La carpeta
+    /// de datos de usuario de <c>%LocalAppData%</c> es del usuario que abre la app, así
+    /// que siempre tiene permiso de escritura ahí, esté instalado donde esté JMBackup.
+    /// </summary>
+    private static Task<CoreWebView2Environment> CreateWebView2EnvironmentAsync()
+    {
+        var userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "JMBackup", "WebView2");
+        return CoreWebView2Environment.CreateAsync(browserExecutableFolder: null, userDataFolder);
     }
 
     private static async Task<bool> IsLockRequiredAsync()
