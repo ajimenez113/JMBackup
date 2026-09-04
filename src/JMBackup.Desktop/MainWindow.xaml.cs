@@ -24,8 +24,8 @@ public partial class MainWindow : Window
     // Las dos variantes de color del ícono de la bandeja según el estado de salud del
     // servicio (ver UpdateTrayHealthAsync) — antes era un solo GeneratedIconSource de
     // texto ("J") al que se le cambiaba el color de fondo; ahora son dos íconos reales.
-    private static readonly BitmapImage TrayIconOk = new(new Uri("pack://application:,,,/Assets/tray-ok.png"));
-    private static readonly BitmapImage TrayIconAlert = new(new Uri("pack://application:,,,/Assets/tray-alert.png"));
+    private static readonly BitmapImage TrayIconOk = new(new Uri("pack://application:,,,/Assets/tray-ok.ico"));
+    private static readonly BitmapImage TrayIconAlert = new(new Uri("pack://application:,,,/Assets/tray-alert.ico"));
 
     private readonly ServiceLauncher _serviceLauncher = new(Port);
     private readonly DispatcherTimer _healthTimer = new() { Interval = TimeSpan.FromSeconds(15) };

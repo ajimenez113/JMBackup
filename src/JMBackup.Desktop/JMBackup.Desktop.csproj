@@ -23,8 +23,8 @@
          sistema, en sus dos variantes de color según el estado de salud del servicio
          (ver MainWindow.UpdateTrayHealthAsync). -->
     <Resource Include="Assets\jmbackup.ico" />
-    <Resource Include="Assets\tray-ok.png" />
-    <Resource Include="Assets\tray-alert.png" />
+    <Resource Include="Assets\tray-ok.ico" />
+    <Resource Include="Assets\tray-alert.ico" />
   </ItemGroup>
 
 </Project>
