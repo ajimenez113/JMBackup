@@ -36,6 +36,26 @@ function groupTasks(tasks: TaskSummaryResponse[], groups: TaskGroupResponse[], u
   return [...buckets.values()]
 }
 
+const COLLAPSED_GROUPS_STORAGE_KEY = 'jmbackup.collapsedGroups'
+
+function readCollapsedGroups(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY)
+    return raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function writeCollapsedGroups(groups: Set<string>) {
+  try {
+    localStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify([...groups]))
+  } catch {
+    // Sin localStorage disponible (navegación privada, por ejemplo): el plegado
+    // simplemente no persiste entre pestañas, no es un error que deba interrumpir nada.
+  }
+}
+
 function GroupSection({
   bucket,
   liveProgress,
@@ -47,13 +67,30 @@ function GroupSection({
   selectedTaskId: number | undefined
   onSelectTask: (taskId: number) => void
 }) {
-  const [collapsed, setCollapsed] = useState(false)
+  // Estado local nada más: al cambiar de pestaña, este componente se desmonta y
+  // remonta, así que el plegado tiene que sobrevivir en localStorage — no alcanza con
+  // useState solo, porque cada remontaje volvía a arrancar en "expandido".
+  const [collapsed, setCollapsed] = useState(() => readCollapsedGroups().has(bucket.key))
+
+  function toggleCollapsed() {
+    setCollapsed((value) => {
+      const next = !value
+      const stored = readCollapsedGroups()
+      if (next) {
+        stored.add(bucket.key)
+      } else {
+        stored.delete(bucket.key)
+      }
+      writeCollapsedGroups(stored)
+      return next
+    })
+  }
 
   return (
     <div className="border-b border-border-subtle last:border-b-0">
       <button
         type="button"
-        onClick={() => setCollapsed((value) => !value)}
+        onClick={toggleCollapsed}
         className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-semibold text-fg-muted
           hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >

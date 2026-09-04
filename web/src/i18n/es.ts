@@ -133,6 +133,9 @@ export const es = {
       sessionInactivityMinutes: 'Cierre de sesión por inactividad (minutos)',
     },
     web: {
+      noCredentialWarning:
+        'Sin usuario y contraseña configurados (pestaña Seguridad), el servicio solo escucha en 127.0.0.1 sin importar la dirección que pongas acá — es la protección de RF-105 contra exponer el respaldo a la red sin querer.',
+      restartRequiredNotice: 'Un cambio de dirección o puerto recién se aplica al reiniciar el servicio de JMBackup, no al guardar.',
       listenAddress: 'Dirección de escucha',
       port: 'Puerto',
       portChecking: 'Verificando disponibilidad…',

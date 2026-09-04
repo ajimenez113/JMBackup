@@ -42,6 +42,68 @@ app, sin importar dónde esté instalado JMBackup. Si ves este error, actualizá
 versión más nueva (o regenerá el instalador con `build\Build-Installer.ps1` si estás
 compilando vos mismo).
 
+## Una tarea "corre" pero no copia nada, y en Historial dice "Falló"
+
+**Síntoma:** ejecutás una tarea (a mano o programada), el estado pasa por "Corriendo"
+un instante y termina en "Falló" — ningún archivo se copió. En Historial, el motivo
+es algo como `La ruta "C:\Users\<usuario>\Documents\..." no existe.` o
+`...\Downloads\...` — una carpeta que en realidad sí existe cuando la abrís vos mismo
+en el Explorador.
+
+**Causa:** el instalador crea una **cuenta de servicio dedicada** (`JMBackupSvc` por
+defecto, ADR-008) — un usuario de Windows distinto al tuyo. Las carpetas de perfil de
+un usuario (`C:\Users\<tu-usuario>\Documents`, `\Downloads`, `\Desktop`, etc.) están
+protegidas por NTFS para que ni siquiera otra cuenta local pueda leerlas sin permiso
+explícito — por eso la cuenta del servicio "no ve" esas rutas, aunque vos sí. No es un
+error de JMBackup: es exactamente lo que se espera de una cuenta con privilegios
+mínimos.
+
+**Solución**, dos formas — elegí según cuánto uses rutas de tu propio perfil:
+
+- **Si son pocas carpetas puntuales**, dale permiso explícito a la cuenta del
+  servicio sobre cada una:
+  ```powershell
+  icacls "C:\Users\<tu-usuario>\Documents\LaCarpeta" /grant "JMBackupSvc:(OI)(CI)(RX)"
+  ```
+  (Cambiá `RX` por `M` si esa carpeta es un destino, no solo un origen — necesita
+  poder escribir ahí.)
+- **Si vas a usar sobre todo carpetas de tu propio perfil**, es más simple hacer que
+  el servicio corra con tu propia cuenta de Windows en vez de la dedicada:
+  ```powershell
+  .\build\Set-JMBackupServiceAccount.ps1 -ExistingAccountUsername "TU-DOMINIO\tu-usuario"
+  ```
+  Esto renuncia al aislamiento de privilegios mínimos de la cuenta dedicada a cambio
+  de que el servicio vea automáticamente todo lo que tu propio usuario ve — la misma
+  decisión que ya se tomó para el desarrollo de este proyecto (ver la nota sobre el
+  autor en `docs/CLAUDE.md` y la sección correspondiente del historial de decisiones).
+
+Ver también ["El servicio no tiene acceso a un recurso de red
+(SMB/UNC)"](#el-servicio-no-tiene-acceso-a-un-recurso-de-red-smbunc) — es la misma
+causa raíz, aplicada a una carpeta local en vez de un recurso compartido de red.
+
+## Cambié la dirección de escucha o el puerto y sigue entrando por `127.0.0.1`
+
+**Síntoma:** en Configuración → Web ponés una IP de la red (por ejemplo
+`10.0.0.50`) o cambiás el puerto, guardás, y `GET /api/settings/web` confirma que se
+guardó bien — pero desde otro equipo la interfaz sigue sin responder, o solo
+responde en `https://127.0.0.1:<puerto>`.
+
+**Causa**, dos cosas a la vez:
+
+1. **Kestrel (el servidor web) solo lee la dirección de escucha al arrancar el
+   servicio** — no hay ninguna reconfiguración en caliente. Guardar el valor nuevo no
+   alcanza: hace falta **reiniciar el servicio de JMBackup** (`services.msc`, o
+   `Restart-Service JMBackup` elevado) para que Kestrel vuelva a leerlo.
+2. **RF-105, "seguro por defecto":** mientras no haya un usuario y contraseña
+   configurados en Configuración → Seguridad (ni `AllowUnauthenticatedLan`
+   activado), el servicio escucha **solo en `127.0.0.1`**, sin importar qué diga el
+   campo de dirección — es la protección para que nadie exponga el respaldo a la red
+   sin querer.
+
+**Solución:** configurá usuario y contraseña en Configuración → Seguridad primero,
+guardá la dirección/puerto deseados en Configuración → Web, y reiniciá el servicio.
+La propia pestaña Web ya avisa de ambas condiciones si falta alguna.
+
 ## El servicio no tiene acceso a un recurso de red (SMB/UNC)
 
 **Síntoma:** una tarea con una ruta de red (`\\SERVIDOR\recurso`) falla con

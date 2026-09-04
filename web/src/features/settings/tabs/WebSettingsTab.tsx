@@ -3,12 +3,13 @@ import { Button } from '../../../components/Button'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
 import { useStrings } from '../../../i18n'
-import { useCertificateInfo, usePortCheck, useWebSettings } from '../useSettings'
+import { useCertificateInfo, usePortCheck, useSecuritySettings, useWebSettings } from '../useSettings'
 
 export function WebSettingsTab() {
   const strings = useStrings()
   const { data, save, isSaving } = useWebSettings()
   const certificateQuery = useCertificateInfo()
+  const securityQuery = useSecuritySettings()
 
   const [listenAddress, setListenAddress] = useState('127.0.0.1')
   const [port, setPort] = useState('8483')
@@ -31,8 +32,17 @@ export function WebSettingsTab() {
     setSavedNotice(true)
   }
 
+  const hasCredential = Boolean(securityQuery.data?.username)
+
   return (
     <div className="flex flex-col gap-4">
+      {!hasCredential ? (
+        <p className="rounded-jm border border-warning bg-warning/10 px-3 py-2 text-sm text-fg">
+          {strings.settings.web.noCredentialWarning}
+        </p>
+      ) : null}
+      <p className="text-xs text-fg-muted">{strings.settings.web.restartRequiredNotice}</p>
+
       <Input label={strings.settings.web.listenAddress} value={listenAddress} onChange={(event) => setListenAddress(event.target.value)} />
 
       <Input
