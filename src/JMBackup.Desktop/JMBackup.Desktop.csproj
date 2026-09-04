@@ -8,12 +8,23 @@
          publish" (ver README), no acá: son decisiones del momento de publicar, no
          del proyecto. ReadyToRun sí es una propiedad del proyecto. -->
     <PublishReadyToRun>true</PublishReadyToRun>
+    <ApplicationIcon>Assets\jmbackup.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="H.NotifyIcon.Wpf" />
     <PackageReference Include="Microsoft.Web.WebView2" />
     <PackageReference Include="System.ServiceProcess.ServiceController" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Además de ícono del ejecutable (ApplicationIcon arriba): como recursos de WPF,
+         para poder referenciarlos desde XAML/código — el ícono de la bandeja del
+         sistema, en sus dos variantes de color según el estado de salud del servicio
+         (ver MainWindow.UpdateTrayHealthAsync). -->
+    <Resource Include="Assets\jmbackup.ico" />
+    <Resource Include="Assets\tray-ok.png" />
+    <Resource Include="Assets\tray-alert.png" />
   </ItemGroup>
 
 </Project>

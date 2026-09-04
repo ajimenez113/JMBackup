@@ -12,6 +12,7 @@
          GenerateOpenApiDocuments contra este único proyecto antes de correr NSwag. -->
     <OpenApiGenerateDocumentsOnBuild>false</OpenApiGenerateDocumentsOnBuild>
     <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)\..\..\web\openapi</OpenApiDocumentsDirectory>
+    <ApplicationIcon>Assets\jmbackup.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,7 +1,7 @@
 using System.IO;
 using System.Net.Http;
 using System.Windows;
-using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using JMBackup.Desktop.Bridge;
 using JMBackup.Desktop.Services;
@@ -20,6 +20,12 @@ public partial class MainWindow : Window
     private const string DesktopClientHeaderValue = "Desktop";
 
     private static readonly Uri ExpectedOrigin = new($"https://127.0.0.1:{Port}");
+
+    // Las dos variantes de color del ícono de la bandeja según el estado de salud del
+    // servicio (ver UpdateTrayHealthAsync) — antes era un solo GeneratedIconSource de
+    // texto ("J") al que se le cambiaba el color de fondo; ahora son dos íconos reales.
+    private static readonly BitmapImage TrayIconOk = new(new Uri("pack://application:,,,/Assets/tray-ok.png"));
+    private static readonly BitmapImage TrayIconAlert = new(new Uri("pack://application:,,,/Assets/tray-alert.png"));
 
     private readonly ServiceLauncher _serviceLauncher = new(Port);
     private readonly DispatcherTimer _healthTimer = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -176,9 +182,7 @@ public partial class MainWindow : Window
     private async Task UpdateTrayHealthAsync()
     {
         var isRunning = await _serviceLauncher.EnsureRunningAsync(CancellationToken.None);
-        TrayIconSource.Background = new SolidColorBrush(isRunning
-            ? Color.FromRgb(0x00, 0x00, 0x80)
-            : Color.FromRgb(0xDC, 0x26, 0x26));
+        TrayIcon.IconSource = isRunning ? TrayIconOk : TrayIconAlert;
         TrayIcon.ToolTipText = isRunning ? "JMBackup — el servicio está corriendo" : "JMBackup — el servicio no responde";
     }
 

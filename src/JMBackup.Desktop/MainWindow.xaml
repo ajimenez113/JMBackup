@@ -12,7 +12,7 @@
                         ToolTipText="JMBackup"
                         TrayLeftMouseUp="TrayIcon_TrayLeftMouseUp">
             <tb:TaskbarIcon.IconSource>
-                <tb:GeneratedIconSource x:Name="TrayIconSource" Text="J" Foreground="White" Background="#000080" FontWeight="Bold" />
+                <BitmapImage UriSource="pack://application:,,,/Assets/tray-ok.png" />
             </tb:TaskbarIcon.IconSource>
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>

@@ -34,6 +34,7 @@ DefaultDirName={autopf}\JMBackup
 DefaultGroupName=JMBackup
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\desktop\JMBackup.Desktop.exe
+SetupIconFile=..\src\JMBackup.Desktop\Assets\jmbackup.ico
 OutputDir=dist
 OutputBaseFilename=JMBackup-Setup-{#MyAppVersion}
 Compression=lzma2
