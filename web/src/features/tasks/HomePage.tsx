@@ -26,6 +26,7 @@ export function HomePage() {
         selectedTaskId={selectedTaskId}
         firstTaskId={firstTaskId}
         hasRunningTasks={liveProgress.size > 0}
+        isSelectedTaskRunning={selectedTaskId !== undefined && liveProgress.has(selectedTaskId)}
         onOpenAbout={() => setAboutOpen(true)}
       />
       <div className="flex-1 overflow-y-auto p-4">

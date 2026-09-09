@@ -32,6 +32,7 @@ export function useTaskActions() {
   const cancel = useMutation({ mutationFn: (taskId: number) => apiClient.cancel(taskId), onSuccess: invalidateSummary })
   const pauseAll = useMutation({ mutationFn: () => apiClient.pauseAll() })
   const cancelAll = useMutation({ mutationFn: () => apiClient.cancelAll(), onSuccess: invalidateSummary })
+  const deleteTask = useMutation({ mutationFn: (taskId: number) => apiClient.tasksDELETE(taskId), onSuccess: invalidateSummary })
 
   return {
     runAll: runAll.mutateAsync,
@@ -40,5 +41,6 @@ export function useTaskActions() {
     cancel: cancel.mutateAsync,
     pauseAll: pauseAll.mutateAsync,
     cancelAll: cancelAll.mutateAsync,
+    deleteTask: deleteTask.mutateAsync,
   }
 }

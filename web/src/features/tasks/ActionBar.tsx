@@ -8,15 +8,23 @@ interface ActionBarProps {
   selectedTaskId: number | undefined
   firstTaskId: number | undefined
   hasRunningTasks: boolean
+  isSelectedTaskRunning: boolean
   onOpenAbout: () => void
 }
 
-export function ActionBar({ selectedTaskId, firstTaskId, hasRunningTasks, onOpenAbout }: ActionBarProps) {
+export function ActionBar({ selectedTaskId, firstTaskId, hasRunningTasks, isSelectedTaskRunning, onOpenAbout }: ActionBarProps) {
   const strings = useStrings()
   const navigate = useNavigate()
   const actions = useTaskActions()
 
   const targetTaskId = selectedTaskId ?? firstTaskId
+
+  async function handleDelete() {
+    if (selectedTaskId === undefined || !window.confirm(strings.actionBar.deleteConfirm)) {
+      return
+    }
+    await actions.deleteTask(selectedTaskId)
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle bg-bg-elevated px-4 py-3">
@@ -52,6 +60,14 @@ export function ActionBar({ selectedTaskId, firstTaskId, hasRunningTasks, onOpen
       </Tooltip>
 
       <div className="ms-auto flex items-center gap-2">
+        <Tooltip content={strings.actionBar.deleteTaskTitle}>
+          <Button variant="danger" disabled={selectedTaskId === undefined || isSelectedTaskRunning} onClick={() => void handleDelete()}>
+            {strings.actionBar.deleteTask}
+          </Button>
+        </Tooltip>
+
+        <div className="mx-1 h-6 w-px bg-border-subtle" aria-hidden="true" />
+
         <Tooltip content={strings.actionBar.addTitle}>
           <Button onClick={() => navigate('/tasks/new')}>{strings.actionBar.add}</Button>
         </Tooltip>
