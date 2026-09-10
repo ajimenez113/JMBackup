@@ -58,7 +58,12 @@ explícito — por eso la cuenta del servicio "no ve" esas rutas, aunque vos sí
 error de JMBackup: es exactamente lo que se espera de una cuenta con privilegios
 mínimos.
 
-**Solución**, dos formas — elegí según cuánto uses rutas de tu propio perfil:
+**La forma de evitarlo desde el principio:** al instalar, en la pantalla "Cuenta del
+servicio" elegí **"Mi cuenta de Windows"** en vez de la cuenta dedicada. El servicio
+corre con tu identidad y ve automáticamente lo mismo que vos.
+
+**Si ya lo instalaste con la cuenta dedicada**, dos formas de arreglarlo — elegí
+según cuánto uses rutas de tu propio perfil:
 
 - **Si son pocas carpetas puntuales**, dale permiso explícito a la cuenta del
   servicio sobre cada una:
@@ -67,15 +72,14 @@ mínimos.
   ```
   (Cambiá `RX` por `M` si esa carpeta es un destino, no solo un origen — necesita
   poder escribir ahí.)
-- **Si vas a usar sobre todo carpetas de tu propio perfil**, es más simple hacer que
-  el servicio corra con tu propia cuenta de Windows en vez de la dedicada:
+- **Si vas a usar sobre todo carpetas de tu propio perfil**, cambiá la cuenta del
+  servicio a la tuya sin reinstalar:
   ```powershell
-  .\build\Set-JMBackupServiceAccount.ps1 -ExistingAccountUsername "TU-DOMINIO\tu-usuario"
+  .\build\Set-JMBackupServiceAccount.ps1 -Username "TU-DOMINIO\tu-usuario"
   ```
-  Esto renuncia al aislamiento de privilegios mínimos de la cuenta dedicada a cambio
-  de que el servicio vea automáticamente todo lo que tu propio usuario ve — la misma
-  decisión que ya se tomó para el desarrollo de este proyecto (ver la nota sobre el
-  autor en `docs/CLAUDE.md` y la sección correspondiente del historial de decisiones).
+  (Te pide la contraseña en una ventana aparte.) Esto renuncia al aislamiento de
+  privilegios mínimos de la cuenta dedicada a cambio de que el servicio vea
+  automáticamente todo lo que tu propio usuario ve.
 
 Ver también ["El servicio no tiene acceso a un recurso de red
 (SMB/UNC)"](#el-servicio-no-tiene-acceso-a-un-recurso-de-red-smbunc) — es la misma

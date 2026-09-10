@@ -55,13 +55,29 @@ tareas las va a pedir al agregar una ruta de red (ver el manual de usuario,
 
    `[CAPTURA: página de confianza del certificado, con la casilla y el texto explicativo]`
 
-5. **Instalación.** El instalador copia los archivos, crea la cuenta de servicio
-   dedicada `JMBackupSvc` (no `LocalSystem` — ver la nota de seguridad más abajo),
-   registra el servicio con arranque automático retrasado, abre la regla de firewall
-   entrante para el puerto configurado (8483 por defecto) en los perfiles Dominio y
-   Privada, y activa las rutas largas de NTFS.
+5. **Cuenta del servicio.** Elegí con qué cuenta de Windows corre el servicio en
+   segundo plano:
+   - **Cuenta de servicio dedicada** (por defecto, recomendada): más segura
+     (privilegios mínimos), pero **no ve tus carpetas personales** —Documentos,
+     Descargas, Escritorio— sin darle permiso a mano a cada una. Ver la nota de
+     seguridad más abajo y la sección correspondiente en
+     [`05-RESOLUCION-DE-PROBLEMAS.md`](05-RESOLUCION-DE-PROBLEMAS.md).
+   - **Mi cuenta de Windows**: el instalador pide tu usuario (`DOMINIO\usuario`) y
+     contraseña, y el servicio corre con esa identidad — ve automáticamente lo mismo
+     que ves vos, sin permisos extra. Conviene si vas a respaldar sobre todo carpetas
+     tuyas o recursos de red con tu propia identidad.
 
-6. **Fin.** El servicio queda corriendo. Abrí JMBackup desde el acceso directo para
+   `[CAPTURA: página de cuenta del servicio, con las dos opciones]`
+
+6. **Instalación.** El instalador copia los archivos, crea (o configura) la cuenta del
+   servicio según lo elegido en el paso anterior, le otorga el derecho "Iniciar
+   sesión como servicio", registra el servicio con arranque automático retrasado,
+   abre la regla de firewall entrante para el puerto configurado (8483 por defecto)
+   en los perfiles Dominio y Privada, y activa las rutas largas de NTFS. Si el
+   servicio no queda corriendo al terminar (contraseña incorrecta, por ejemplo), el
+   instalador lo avisa.
+
+7. **Fin.** El servicio queda corriendo. Abrí JMBackup desde el acceso directo para
    empezar — ver [`manual-usuario/01-primera-tarea.md`](manual-usuario/01-primera-tarea.md).
 
 ## Por qué una cuenta de servicio dedicada, no LocalSystem

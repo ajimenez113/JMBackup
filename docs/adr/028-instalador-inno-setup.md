@@ -136,3 +136,25 @@ Con las tres correcciones de esta fase (manejo de excepciones, chequeo del runti
 carpeta de datos de usuario) el instalador se regeneró y compiló sin errores — falta
 confirmar que la app de escritorio abre correctamente con este instalador nuevo en la
 máquina real donde apareció el problema.
+
+### Actualización — elección de cuenta del servicio en el instalador (2026-09-10)
+
+En uso real, las tareas fallaban con `StorageOperationException: "la ruta no existe"`
+sobre carpetas que sí existen (`C:\Users\<usuario>\Downloads\...`). Causa: la cuenta
+de servicio dedicada (`JMBackupSvc`) no tiene permiso NTFS sobre las carpetas de
+perfil del usuario interactivo, y Windows reporta eso como "no existe" en vez de
+"acceso denegado". Hasta acá, la única solución era el script separado
+`Set-JMBackupServiceAccount.ps1` DESPUÉS de instalar.
+
+Ahora el instalador tiene una página **"Cuenta del servicio"** con dos opciones:
+cuenta dedicada (por defecto, ADR-008) o la cuenta de Windows de la persona (pide
+usuario y contraseña ahí mismo). La contraseña NO va por la línea de comandos: se
+escribe a un archivo temporal en `{tmp}` que `Install-JMBackupService.ps1` lee con su
+parámetro nuevo `-ExistingAccountPasswordFile` y borra de inmediato. El instalador
+también verifica al terminar que el servicio "JMBackup" quedó realmente corriendo
+(cubre el caso de contraseña incorrecta, que Inno Setup por sí solo no detectaría de
+un `[Run]`).
+
+Compilado con ISCC sin errores; falta ejecutar el instalador de verdad con la opción
+"mi cuenta" en una máquina real para confirmar el flujo completo (escritura del
+archivo temporal, lectura desde PowerShell, arranque del servicio con esa identidad).

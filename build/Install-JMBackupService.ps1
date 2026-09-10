@@ -54,6 +54,10 @@ param(
     [string]$InstallPath = (Join-Path $PSScriptRoot "..\publish"),
     [string]$ServiceAccountName = "JMBackupSvc",
     [string]$ExistingAccountUsername,
+    # Archivo de texto con la contraseña de -ExistingAccountUsername, en una sola línea.
+    # Lo usa el instalador de Inno Setup para no tener que abrir Get-Credential a mano.
+    # Se lee y se borra de inmediato. Si no se pasa, la contraseña se pide interactiva.
+    [string]$ExistingAccountPasswordFile,
     [int]$Port = 8483
 )
 
@@ -104,7 +108,19 @@ function New-RandomServicePassword {
 #    si se pasó -ExistingAccountUsername.
 if ($ExistingAccountUsername) {
     $accountName = $ExistingAccountUsername
-    $credential = Get-Credential -UserName $accountName -Message "Contraseña de $accountName para el servicio $ServiceName"
+    if ($ExistingAccountPasswordFile) {
+        if (-not (Test-Path $ExistingAccountPasswordFile)) {
+            throw "No se encontró el archivo de contraseña '$ExistingAccountPasswordFile'."
+        }
+        # Se lee la primera línea, se arma la credencial, y se borra el archivo antes de
+        # seguir — la contraseña solo vive en memoria a partir de acá.
+        $securePassword = ConvertTo-SecureString -String ((Get-Content -Path $ExistingAccountPasswordFile -TotalCount 1).Trim()) -AsPlainText -Force
+        Remove-Item -Path $ExistingAccountPasswordFile -Force -ErrorAction SilentlyContinue
+        $credential = New-Object Management.Automation.PSCredential($accountName, $securePassword)
+    }
+    else {
+        $credential = Get-Credential -UserName $accountName -Message "Contraseña de $accountName para el servicio $ServiceName"
+    }
     $sid = (New-Object Security.Principal.NTAccount($accountName)).Translate([Security.Principal.SecurityIdentifier]).Value
 }
 else {

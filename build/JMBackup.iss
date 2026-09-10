@@ -71,12 +71,13 @@ Name: "{group}\Desinstalar JMBackup"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\JMBackup"; Filename: "{app}\desktop\JMBackup.Desktop.exe"; Tasks: desktopicon
 
 [Run]
-; 1. Cuenta de servicio dedicada, derecho "Iniciar sesión como servicio", registro
-;    del servicio (arranque automático retrasado), regla de firewall y
-;    LongPathsEnabled: todo lo que ya hacía el script de hito 1, ahora invocado
-;    automáticamente en vez de a mano.
+; 1. Cuenta de servicio, derecho "Iniciar sesión como servicio", registro del servicio
+;    (arranque automático retrasado), regla de firewall y LongPathsEnabled: todo lo
+;    que ya hacía el script de hito 1, ahora invocado automáticamente. Los parámetros
+;    los arma GetServiceInstallParameters según lo elegido en la página "Cuenta del
+;    servicio" (cuenta dedicada, o la cuenta de Windows de la persona).
 Filename: "powershell.exe"; \
-    Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\build\Install-JMBackupService.ps1"" -InstallPath ""{app}"""; \
+    Parameters: "{code:GetServiceInstallParameters}"; \
     StatusMsg: "Configurando el servicio de JMBackup..."; \
     Flags: runhidden waituntilterminated
 
@@ -111,6 +112,15 @@ var
   TrustCertPage: TWizardPage;
   TrustCertCheckBox: TNewCheckBox;
 
+  ServiceAccountPage: TWizardPage;
+  DedicatedRadio: TNewRadioButton;
+  MyAccountRadio: TNewRadioButton;
+  UsernameEdit: TNewEdit;
+  PasswordEdit: TPasswordEdit;
+  UsernameLabel: TNewStaticText;
+  PasswordLabel: TNewStaticText;
+  ServicePasswordFile: String;
+
 // La app de escritorio usa el modelo "Evergreen" de WebView2: el motor de
 // renderizado lo tiene que tener instalado el sistema operativo (viene con Windows
 // 11 y con Edge en la mayoría de Windows 10, pero NO con Windows Server por
@@ -128,6 +138,89 @@ begin
     RegQueryStringValue(HKLM64, 'SOFTWARE\WOW6432Node' + ClientKeySuffix, 'pv', Version)
     or RegQueryStringValue(HKLM64, 'SOFTWARE' + ClientKeySuffix, 'pv', Version)
     or RegQueryStringValue(HKCU, 'SOFTWARE' + ClientKeySuffix, 'pv', Version);
+end;
+
+procedure UpdateServiceAccountFields;
+var
+  UseMyAccount: Boolean;
+begin
+  UseMyAccount := MyAccountRadio.Checked;
+  UsernameLabel.Enabled := UseMyAccount;
+  UsernameEdit.Enabled := UseMyAccount;
+  PasswordLabel.Enabled := UseMyAccount;
+  PasswordEdit.Enabled := UseMyAccount;
+end;
+
+procedure ServiceAccountRadioClicked(Sender: TObject);
+begin
+  UpdateServiceAccountFields;
+end;
+
+procedure CreateServiceAccountPage;
+var
+  Explain: TNewStaticText;
+begin
+  ServiceAccountPage := CreateCustomPage(TrustCertPage.ID,
+    'Cuenta del servicio de JMBackup', 'Con qué cuenta de Windows corre el servicio en segundo plano');
+
+  Explain := TNewStaticText.Create(ServiceAccountPage);
+  Explain.Parent := ServiceAccountPage.Surface;
+  Explain.AutoSize := False;
+  Explain.WordWrap := True;
+  Explain.Left := 0;
+  Explain.Top := 0;
+  Explain.Width := ServiceAccountPage.SurfaceWidth;
+  Explain.Height := 92;
+  Explain.Caption :=
+    'La cuenta de servicio dedicada es más segura (privilegios mínimos), pero no ve ' +
+    'tus carpetas personales —Documentos, Descargas, Escritorio— sin darle permiso a ' +
+    'mano a cada una. Si vas a respaldar sobre todo carpetas tuyas o recursos de red ' +
+    'con tu propia identidad, elegí tu cuenta de Windows: el servicio ve automáticamente ' +
+    'lo mismo que vos.';
+
+  DedicatedRadio := TNewRadioButton.Create(ServiceAccountPage);
+  DedicatedRadio.Parent := ServiceAccountPage.Surface;
+  DedicatedRadio.Left := 0;
+  DedicatedRadio.Top := Explain.Top + Explain.Height + 8;
+  DedicatedRadio.Width := ServiceAccountPage.SurfaceWidth;
+  DedicatedRadio.Caption := 'Cuenta de servicio dedicada (recomendada)';
+  DedicatedRadio.Checked := True;
+  DedicatedRadio.OnClick := @ServiceAccountRadioClicked;
+
+  MyAccountRadio := TNewRadioButton.Create(ServiceAccountPage);
+  MyAccountRadio.Parent := ServiceAccountPage.Surface;
+  MyAccountRadio.Left := 0;
+  MyAccountRadio.Top := DedicatedRadio.Top + 24;
+  MyAccountRadio.Width := ServiceAccountPage.SurfaceWidth;
+  MyAccountRadio.Caption := 'Mi cuenta de Windows';
+  MyAccountRadio.OnClick := @ServiceAccountRadioClicked;
+
+  UsernameLabel := TNewStaticText.Create(ServiceAccountPage);
+  UsernameLabel.Parent := ServiceAccountPage.Surface;
+  UsernameLabel.Left := 24;
+  UsernameLabel.Top := MyAccountRadio.Top + 28;
+  UsernameLabel.Caption := 'Usuario (DOMINIO\usuario o EQUIPO\usuario)';
+
+  UsernameEdit := TNewEdit.Create(ServiceAccountPage);
+  UsernameEdit.Parent := ServiceAccountPage.Surface;
+  UsernameEdit.Left := 24;
+  UsernameEdit.Top := UsernameLabel.Top + 18;
+  UsernameEdit.Width := ServiceAccountPage.SurfaceWidth - 24;
+  UsernameEdit.Text := GetEnv('USERDOMAIN') + '\' + GetEnv('USERNAME');
+
+  PasswordLabel := TNewStaticText.Create(ServiceAccountPage);
+  PasswordLabel.Parent := ServiceAccountPage.Surface;
+  PasswordLabel.Left := 24;
+  PasswordLabel.Top := UsernameEdit.Top + 30;
+  PasswordLabel.Caption := 'Contraseña';
+
+  PasswordEdit := TPasswordEdit.Create(ServiceAccountPage);
+  PasswordEdit.Parent := ServiceAccountPage.Surface;
+  PasswordEdit.Left := 24;
+  PasswordEdit.Top := PasswordLabel.Top + 18;
+  PasswordEdit.Width := ServiceAccountPage.SurfaceWidth - 24;
+
+  UpdateServiceAccountFields;
 end;
 
 procedure InitializeWizard;
@@ -165,6 +258,8 @@ begin
   TrustCertCheckBox.Width := TrustCertPage.SurfaceWidth;
   TrustCertCheckBox.Caption := 'Confiar en el certificado HTTPS de JMBackup en este equipo';
   TrustCertCheckBox.Checked := False;
+
+  CreateServiceAccountPage;
 end;
 
 function ShouldTrustCertificate: Boolean;
@@ -172,17 +267,78 @@ begin
   Result := TrustCertCheckBox.Checked;
 end;
 
+function GetServiceInstallParameters(Param: String): String;
+begin
+  Result :=
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\build\Install-JMBackupService.ps1') + '"' +
+    ' -InstallPath "' + ExpandConstant('{app}') + '"';
+  if MyAccountRadio.Checked then
+    Result := Result +
+      ' -ExistingAccountUsername "' + UsernameEdit.Text + '"' +
+      ' -ExistingAccountPasswordFile "' + ServicePasswordFile + '"';
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = ServiceAccountPage.ID) and MyAccountRadio.Checked then
+  begin
+    if Pos('\', UsernameEdit.Text) = 0 then
+    begin
+      MsgBox('Escribí el usuario en formato DOMINIO\usuario o EQUIPO\usuario.', mbError, MB_OK);
+      Result := False;
+    end
+    else if PasswordEdit.Text = '' then
+    begin
+      MsgBox('Escribí la contraseña de esa cuenta.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+function IsJMBackupServiceRunning: Boolean;
+var
+  ResultCode: Integer;
+begin
+  // "sc query" devuelve 0 si el servicio existe y está corriendo, distinto de 0 si no.
+  Result := Exec(ExpandConstant('{sys}\cmd.exe'),
+    '/c sc query "' + '{#MyServiceName}' + '" | findstr /i "RUNNING" > nul',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if (CurStep = ssPostInstall) and not IsWebView2RuntimeInstalled then
+  if CurStep = ssInstall then
   begin
-    MsgBox(
-      'JMBackup se instaló, pero este equipo no tiene el WebView2 Runtime de ' +
-      'Microsoft Edge — lo necesita la aplicación de escritorio para mostrar su ' +
-      'interfaz (la interfaz web por navegador funciona igual sin él).' + #13#10#13#10 +
-      'Instalalo desde https://go.microsoft.com/fwlink/p/?LinkId=2124703 antes de ' +
-      'abrir JMBackup desde el acceso directo.',
-      mbInformation, MB_OK);
+    if MyAccountRadio.Checked then
+    begin
+      // La contraseña va a un archivo temporal que Install-JMBackupService.ps1 lee y
+      // borra de inmediato. {tmp} lo limpia Inno al terminar de todas formas. No se
+      // pasa por la línea de comandos (sería visible en la lista de procesos).
+      ServicePasswordFile := ExpandConstant('{tmp}\jmbackup-svc-pw.txt');
+      SaveStringToFile(ServicePasswordFile, PasswordEdit.Text, False);
+    end;
+  end;
+
+  if CurStep = ssPostInstall then
+  begin
+    if not IsJMBackupServiceRunning then
+      MsgBox(
+        'JMBackup se instaló, pero el servicio no quedó corriendo. Lo más común es ' +
+        'que la contraseña de la cuenta de Windows sea incorrecta, o que esa cuenta no ' +
+        'tenga el derecho "Iniciar sesión como servicio".' + #13#10#13#10 +
+        'Revisá el servicio "JMBackup" en services.msc, o volvé a ejecutar el ' +
+        'instalador.',
+        mbError, MB_OK);
+
+    if not IsWebView2RuntimeInstalled then
+      MsgBox(
+        'JMBackup se instaló, pero este equipo no tiene el WebView2 Runtime de ' +
+        'Microsoft Edge — lo necesita la aplicación de escritorio para mostrar su ' +
+        'interfaz (la interfaz web por navegador funciona igual sin él).' + #13#10#13#10 +
+        'Instalalo desde https://go.microsoft.com/fwlink/p/?LinkId=2124703 antes de ' +
+        'abrir JMBackup desde el acceso directo.',
+        mbInformation, MB_OK);
   end;
 end;
 
