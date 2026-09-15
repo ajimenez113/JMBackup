@@ -40,9 +40,28 @@ public sealed record TaskGroupRequest(string Name, int Position);
 
 public sealed record TaskGroupResponse(int Id, string Name, int Position);
 
-public sealed record TaskPathRequest(string Role, string Path, int? CredentialId, int Position);
+public sealed record TaskPathRequest(
+    string Role,
+    string BackendType,
+    string Path,
+    int? CredentialId,
+    int Position,
+    bool Encrypted,
+    string? Region,
+    string? StorageClass,
+    bool ServerSideEncryption);
 
-public sealed record TaskPathResponse(int Id, string Role, string BackendType, string Path, int? CredentialId, int Position);
+public sealed record TaskPathResponse(
+    int Id,
+    string Role,
+    string BackendType,
+    string Path,
+    int? CredentialId,
+    int Position,
+    bool Encrypted,
+    string? Region,
+    string? StorageClass,
+    bool ServerSideEncryption);
 
 public sealed record ConnectionStatusResponse(bool IsConnected, string? Reason, string? Detail);
 

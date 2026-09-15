@@ -30,10 +30,14 @@ public static class TaskPathEndpoints
                 Id = pathId,
                 TaskId = taskId,
                 Role = Enum.Parse<Domain.Enums.TaskPathRole>(request.Role),
-                BackendType = Domain.Enums.BackendType.Local,
+                BackendType = Enum.Parse<Domain.Enums.BackendType>(request.BackendType),
                 Path = request.Path,
                 CredentialId = request.CredentialId,
                 Position = request.Position,
+                Encrypted = request.Encrypted,
+                Region = request.Region,
+                StorageClass = request.StorageClass,
+                ServerSideEncryption = request.ServerSideEncryption,
             };
 
             await repository.UpdatePathAsync(entity, cancellationToken).ConfigureAwait(false);

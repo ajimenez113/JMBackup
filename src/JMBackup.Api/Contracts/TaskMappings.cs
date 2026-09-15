@@ -42,17 +42,22 @@ public static class TaskMappings
 
     public static TaskGroup ToEntity(this TaskGroupRequest request) => new() { Name = request.Name, Position = request.Position };
 
-    public static TaskPathResponse ToResponse(this TaskPath path) =>
-        new(path.Id, path.Role.ToString(), path.BackendType.ToString(), path.Path, path.CredentialId, path.Position);
+    public static TaskPathResponse ToResponse(this TaskPath path) => new(
+        path.Id, path.Role.ToString(), path.BackendType.ToString(), path.Path, path.CredentialId, path.Position,
+        path.Encrypted, path.Region, path.StorageClass, path.ServerSideEncryption);
 
     public static TaskPath ToEntity(this TaskPathRequest request, int taskId) => new()
     {
         TaskId = taskId,
         Role = Enum.Parse<TaskPathRole>(request.Role),
-        BackendType = BackendType.Local,
+        BackendType = Enum.Parse<BackendType>(request.BackendType),
         Path = request.Path,
         CredentialId = request.CredentialId,
         Position = request.Position,
+        Encrypted = request.Encrypted,
+        Region = request.Region,
+        StorageClass = request.StorageClass,
+        ServerSideEncryption = request.ServerSideEncryption,
     };
 
     public static ConnectionStatusResponse ToResponse(this ConnectionStatus status) =>

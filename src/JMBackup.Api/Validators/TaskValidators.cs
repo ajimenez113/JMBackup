@@ -1,5 +1,6 @@
 using FluentValidation;
 using JMBackup.Api.Contracts;
+using JMBackup.Application.Abstractions;
 using JMBackup.Domain.Enums;
 
 namespace JMBackup.Api.Validators;
@@ -32,13 +33,82 @@ public sealed class UpdateTaskRequestValidator : AbstractValidator<UpdateTaskReq
     }
 }
 
+/// <summary>
+/// El formato de <see cref="TaskPathRequest.Path"/> depende del backend (ADR-006):
+/// ruta absoluta local/UNC para <see cref="BackendType.Local"/>,
+/// "servidor[:puerto]/ruta" para <see cref="BackendType.Ftp"/>,
+/// "bucket/prefijo" para <see cref="BackendType.S3"/> (ver StorageBackendFactory, que
+/// interpreta el mismo formato). SFTP se rechaza explícitamente: todavía no existe.
+/// </summary>
 public sealed class TaskPathRequestValidator : AbstractValidator<TaskPathRequest>
 {
-    public TaskPathRequestValidator(Security.PathValidationService pathValidation)
+    public TaskPathRequestValidator(Security.PathValidationService pathValidation, ICredentialRepository credentialRepository)
     {
         RuleFor(request => request.Role).Must(value => Enum.TryParse<TaskPathRole>(value, out _));
+
+        RuleFor(request => request.BackendType)
+            .Must(value => Enum.TryParse<BackendType>(value, out var type) && type != BackendType.Sftp)
+            .WithMessage("SFTP todavía no está implementado.");
+
         RuleFor(request => request.Path).Must(path => pathValidation.Validate(path).IsSuccess)
+            .When(request => request.BackendType == nameof(BackendType.Local))
             .WithMessage("La ruta no es válida o contiene \"..\".");
+
+        RuleFor(request => request.Path).Must(BeAValidFtpPath)
+            .When(request => request.BackendType == nameof(BackendType.Ftp))
+            .WithMessage("La ruta FTP debe tener el formato \"servidor[:puerto]/ruta\".");
+
+        RuleFor(request => request.Path).Must(BeAValidS3Path)
+            .When(request => request.BackendType == nameof(BackendType.S3))
+            .WithMessage("La ruta S3 debe tener el formato \"bucket/prefijo\" (el prefijo es opcional).");
+
+        RuleFor(request => request.Region).NotEmpty()
+            .When(request => request.BackendType == nameof(BackendType.S3))
+            .WithMessage("Una ruta S3 necesita una región.");
+
+        RuleFor(request => request.CredentialId).NotNull()
+            .When(request => request.BackendType is nameof(BackendType.Ftp) or nameof(BackendType.S3))
+            .WithMessage("Una ruta remota necesita una credencial configurada.");
+
+        RuleFor(request => request.CredentialId)
+            .MustAsync(async (credentialId, cancellationToken) => credentialId is null
+                || await credentialRepository.FindAsync(credentialId.Value, cancellationToken).ConfigureAwait(false) is not null)
+            .WithMessage("La credencial seleccionada no existe.");
+    }
+
+    private static bool BeAValidFtpPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Contains(".."))
+        {
+            return false;
+        }
+
+        var trimmed = path.TrimStart('/');
+        var firstSlash = trimmed.IndexOf('/');
+        var hostAndPort = firstSlash < 0 ? trimmed : trimmed[..firstSlash];
+
+        var colonIndex = hostAndPort.IndexOf(':');
+        if (colonIndex < 0)
+        {
+            return hostAndPort.Length > 0;
+        }
+
+        var host = hostAndPort[..colonIndex];
+        var portText = hostAndPort[(colonIndex + 1)..];
+        return host.Length > 0 && int.TryParse(portText, out var port) && port is > 0 and <= 65535;
+    }
+
+    private static bool BeAValidS3Path(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Contains(".."))
+        {
+            return false;
+        }
+
+        var trimmed = path.TrimStart('/');
+        var firstSlash = trimmed.IndexOf('/');
+        var bucket = firstSlash < 0 ? trimmed : trimmed[..firstSlash];
+        return bucket.Length is >= 3 and <= 63;
     }
 }
 

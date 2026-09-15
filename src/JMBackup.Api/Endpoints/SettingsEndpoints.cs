@@ -231,9 +231,15 @@ public static class SettingsEndpoints
 
             foreach (var path in item.Paths)
             {
+                // La exportación/importación de configuración (RF-?? backup/restore de
+                // ajustes) es local a esta instancia: credenciales y backends remotos no
+                // viajan en el archivo, así que toda ruta importada vuelve a Local sin
+                // credencial — el usuario la reconfigura a mano si hacía falta otra cosa.
                 await taskRepository.AddPathAsync(
-                    new TaskPathRequest(path.Role, path.Path, CredentialId: null, path.Position).ToEntity(taskId), cancellationToken)
-                    .ConfigureAwait(false);
+                    new TaskPathRequest(
+                        path.Role, nameof(JMBackup.Domain.Enums.BackendType.Local), path.Path, CredentialId: null, path.Position,
+                        Encrypted: false, Region: null, StorageClass: null, ServerSideEncryption: false).ToEntity(taskId),
+                    cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var exclusion in item.Exclusions)
