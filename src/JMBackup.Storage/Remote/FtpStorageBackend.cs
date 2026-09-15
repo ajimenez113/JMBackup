@@ -20,7 +20,6 @@ namespace JMBackup.Storage.Remote;
 public sealed class FtpStorageBackend : IStorageBackend
 {
     private const string TemporaryFileSuffix = ".jmtmp";
-    private const int CopyBufferSize = 81920;
 
     private readonly string _host;
     private readonly int _port;
@@ -203,7 +202,6 @@ public sealed class FtpStorageBackend : IStorageBackend
         if (ResumeDecision.ShouldResume(existingPartial, size, sourceModifiedUtc))
         {
             resumeFromBytes = existingPartial!.BytesTransferred;
-            SkipBytes(content, resumeFromBytes);
             progress.Report(new TransferProgress(path, resumeFromBytes, size, BytesPerSecond: 0, EstimatedTimeRemaining: null));
         }
         else
@@ -222,7 +220,14 @@ public sealed class FtpStorageBackend : IStorageBackend
             var startedAt = _timeProvider.GetTimestamp();
             var ftpProgress = new Progress<FtpProgress>(reported => ReportUploadProgress(reported, path, size, resumeFromBytes, startedAt, progress));
 
-            var existsMode = resumeFromBytes > 0 ? FtpRemoteExists.AddToEnd : FtpRemoteExists.Overwrite;
+            // Resume (no AddToEnd): AddToEnd simplemente apila el stream local entero al
+            // final del remoto, sin descontar lo ya subido — probado contra un servidor
+            // real, duplicaba los bytes ya transferidos. Resume sí calcula el tamaño
+            // remoto y salta esa cantidad en el stream local, que es lo que
+            // corresponde: ya validamos la identidad del origen con ResumeDecision antes
+            // de llegar acá, así que confiar en que Resume salte hasta el tamaño remoto
+            // (idéntico a resumeFromBytes, que viene de esa misma consulta) es seguro.
+            var existsMode = resumeFromBytes > 0 ? FtpRemoteExists.Resume : FtpRemoteExists.Overwrite;
             var status = await client
                 .UploadStream(content, tempRemotePath, existsMode, createRemoteDir: false, ftpProgress, cancellationToken)
                 .ConfigureAwait(false);
@@ -237,7 +242,22 @@ public sealed class FtpStorageBackend : IStorageBackend
         }
         catch (FtpCommandException ex) when (IsPermissionDenied(ex))
         {
+            ResetConnection();
             throw new StorageOperationException(StorageErrorReason.PermissionDenied, path, $"Permiso denegado al escribir \"{path}\".", ex);
+        }
+        catch
+        {
+            // Una subida que se corta a mitad de camino (la fuente falla, no el
+            // servidor) puede dejar el canal de control desincronizado: el servidor
+            // queda con una respuesta pendiente que nunca se leyó. Confirmado contra
+            // un servidor real (fauria/vsftpd): reusar la misma conexión para el
+            // siguiente intento rompía el parseo de la respuesta EPSV del intento
+            // posterior ("Failed to get the EPSV port from: Delete operation
+            // successful"). Se fuerza reconexión en el próximo uso en vez de confiar
+            // en que IsConnected (solo verifica el socket, no el estado del protocolo)
+            // detecte esto.
+            ResetConnection();
+            throw;
         }
     }
 
@@ -335,6 +355,17 @@ public sealed class FtpStorageBackend : IStorageBackend
         return client;
     }
 
+    /// <summary>
+    /// Fuerza una reconexión en el próximo uso: IsConnected solo confirma que el
+    /// socket sigue abierto, no que el canal de control esté en un estado consistente
+    /// para el próximo comando.
+    /// </summary>
+    private void ResetConnection()
+    {
+        _client?.Dispose();
+        _client = null;
+    }
+
     private void ReportUploadProgress(
         FtpProgress reported, string path, long totalSize, long resumeFromBytes, long startedAtTimestamp, IProgress<TransferProgress> progress)
     {
@@ -354,7 +385,7 @@ public sealed class FtpStorageBackend : IStorageBackend
     }
 
     private string CombineRemote(string relativePath) =>
-        string.IsNullOrEmpty(relativePath) ? _root : $"{_root}/{relativePath}";
+        string.IsNullOrEmpty(relativePath) ? _root : $"{_root.TrimEnd('/')}/{relativePath}";
 
     private static string GetRelativeTo(string queriedRemotePath, string fullRemotePath)
     {
@@ -368,28 +399,6 @@ public sealed class FtpStorageBackend : IStorageBackend
     {
         var lastSlash = remotePath.LastIndexOf('/');
         return lastSlash <= 0 ? null : remotePath[..lastSlash];
-    }
-
-    private static void SkipBytes(Stream stream, long count)
-    {
-        if (stream.CanSeek)
-        {
-            stream.Seek(count, SeekOrigin.Begin);
-            return;
-        }
-
-        var buffer = new byte[CopyBufferSize];
-        var remaining = count;
-        while (remaining > 0)
-        {
-            var read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
-            if (read <= 0)
-            {
-                break;
-            }
-
-            remaining -= read;
-        }
     }
 
     /// <summary>

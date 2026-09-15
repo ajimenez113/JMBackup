@@ -23,8 +23,12 @@ namespace JMBackup.Storage.Tests.Remote;
 public sealed class S3StorageBackendTests : IAsyncLifetime
 {
     private const string BucketName = "jmbackup-test-bucket";
-    private const string AccessKeyId = "test-access-key";
-    private const string SecretAccessKey = "test-secret-key";
+    // LocalStack solo reconoce "cuentas" para las credenciales de prueba documentadas
+    // oficialmente ("test"/"test"); un access key id con forma distinta se rechaza con
+    // "The AWS Access Key Id you provided does not exist in our records" (confirmado
+    // corriendo esta prueba contra un contenedor real).
+    private const string AccessKeyId = "test";
+    private const string SecretAccessKey = "test";
     private const string Region = "us-east-1";
 
     private LocalStackContainer _container = null!;
@@ -32,7 +36,11 @@ public sealed class S3StorageBackendTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _container = new LocalStackBuilder("localstack/localstack:latest")
+        // Pinneado a la última versión "community" antes de que LocalStack exigiera
+        // LOCALSTACK_AUTH_TOKEN (desde la 4.15, confirmado corriendo esta prueba real):
+        // ":latest" hoy resuelve a una versión que requiere una cuenta/token pago, algo
+        // que no corresponde pedirle al usuario solo para correr pruebas locales.
+        _container = new LocalStackBuilder("localstack/localstack:3.8.1")
             .WithEnvironment("SERVICES", "s3")
             .Build();
         await _container.StartAsync();
@@ -47,9 +55,12 @@ public sealed class S3StorageBackendTests : IAsyncLifetime
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
+    // Sin RegionEndpoint acá junto con ServiceURL: confirmado contra un servidor real,
+    // esa combinación hace que el SDK v4 ignore ServiceURL para us-east-1 (su endpoint
+    // "global" legado) y mande la petición a AWS real en vez de al contenedor.
     private AmazonS3Client CreateRawClient() => new(
         AccessKeyId, SecretAccessKey,
-        new AmazonS3Config { ServiceURL = _container.GetConnectionString(), ForcePathStyle = true, RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region) });
+        new AmazonS3Config { ServiceURL = _container.GetConnectionString(), ForcePathStyle = true, AuthenticationRegion = Region });
 
     private S3StorageBackend CreateBackend(string basePrefix = "", string? storageClass = null, bool serverSideEncryption = false) =>
         new(BucketName, basePrefix, AccessKeyId, SecretAccessKey, Region, storageClass, serverSideEncryption, _timeProvider,
@@ -259,8 +270,10 @@ public sealed class S3StorageBackendTests : IAsyncLifetime
         using var secondStream = new MemoryStream(secondContent);
         await backend.WriteAsync("cambia.bin", secondStream, secondContent.Length, secondModifiedUtc, new Progress<TransferProgress>(), CancellationToken.None);
 
+        // El SDK deja MultipartUploads en null (no en una lista vacía) cuando no hay
+        // ningún multipart pendiente — el mismo comportamiento que S3Objects/Parts.
         var pendingAfter = await rawClient.ListMultipartUploadsAsync(new ListMultipartUploadsRequest { BucketName = BucketName, Prefix = "cambia.bin" });
-        pendingAfter.MultipartUploads.Should().BeEmpty("el multipart huérfano tiene que haberse abortado explícitamente, no quedar colgado");
+        (pendingAfter.MultipartUploads ?? []).Should().BeEmpty("el multipart huérfano tiene que haberse abortado explícitamente, no quedar colgado");
 
         var entry = await backend.StatAsync("cambia.bin", CancellationToken.None);
         entry.Should().NotBeNull();

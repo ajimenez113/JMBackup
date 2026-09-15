@@ -89,6 +89,14 @@ public sealed class S3StorageBackend : IStorageBackend
         }
         catch (AmazonS3Exception ex)
         {
+            // HeadBucket es un HEAD: nunca trae cuerpo, así que ErrorCode viene vacío
+            // incluso en un 404 real (confirmado contra un servidor real) — el código
+            // de estado es lo único confiable acá para distinguir "no existe".
+            if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return ConnectionStatus.Failed(StorageErrorReason.PathNotFound, $"El bucket \"{_bucket}\" no existe.");
+            }
+
             var (reason, detail) = S3ConnectionErrorMapper.Map(ex.ErrorCode, _bucket, ex.Message);
             return ConnectionStatus.Failed(reason, detail);
         }
@@ -121,9 +129,12 @@ public sealed class S3StorageBackend : IStorageBackend
 
             var response = await client.ListObjectsV2Async(request, cancellationToken).ConfigureAwait(false);
 
+            // El SDK deja CommonPrefixes/S3Objects en null (no en una lista vacía)
+            // cuando la respuesta no trae ese elemento — confirmado contra un servidor
+            // real con un prefijo sin subcarpetas.
             if (!recursive)
             {
-                foreach (var commonPrefix in response.CommonPrefixes)
+                foreach (var commonPrefix in response.CommonPrefixes ?? [])
                 {
                     var relative = GetRelativeTo(queryPrefix, commonPrefix).TrimEnd('/');
                     if (relative.Length > 0)
@@ -133,7 +144,7 @@ public sealed class S3StorageBackend : IStorageBackend
                 }
             }
 
-            foreach (var s3Object in response.S3Objects)
+            foreach (var s3Object in response.S3Objects ?? [])
             {
                 // El propio "prefijo/" a veces existe como objeto de cero bytes (lo crea
                 // la consola de AWS al mostrar una "carpeta" vacía) — no es una entrada
@@ -321,14 +332,18 @@ public sealed class S3StorageBackend : IStorageBackend
             var listPartsResponse = await client
                 .ListPartsAsync(new ListPartsRequest { BucketName = _bucket, Key = key, UploadId = recorded.UploadId }, cancellationToken)
                 .ConfigureAwait(false);
-            var bytesTransferred = listPartsResponse.Parts.Sum(part => part.Size ?? 0);
+
+            // Igual que S3Objects/CommonPrefixes: null (no lista vacía) cuando el
+            // multipart todavía no tiene ninguna parte subida.
+            var existingParts = listPartsResponse.Parts ?? [];
+            var bytesTransferred = existingParts.Sum(part => part.Size ?? 0);
             var existingPartial = new PartialUpload(recorded.Size, recorded.SourceModifiedUtc, bytesTransferred);
 
             if (ResumeDecision.ShouldResume(existingPartial, size, sourceModifiedUtc))
             {
                 uploadId = recorded.UploadId;
                 resumeFromBytes = bytesTransferred;
-                uploadedParts.AddRange(listPartsResponse.Parts.Select(part => new PartETag(part.PartNumber!.Value, part.ETag)));
+                uploadedParts.AddRange(existingParts.Select(part => new PartETag(part.PartNumber!.Value, part.ETag)));
                 SkipBytes(content, resumeFromBytes);
                 progress.Report(new TransferProgress(path, resumeFromBytes, size, BytesPerSecond: 0, EstimatedTimeRemaining: null));
             }
@@ -436,13 +451,15 @@ public sealed class S3StorageBackend : IStorageBackend
                 new ListObjectsV2Request { BucketName = _bucket, Prefix = prefix, ContinuationToken = continuationToken },
                 cancellationToken).ConfigureAwait(false);
 
-            if (listResponse.S3Objects.Count > 0)
+            // S3Objects viene en null (no en una lista vacía) cuando no hay ningún
+            // objeto bajo el prefijo — confirmado contra un servidor real.
+            if (listResponse.S3Objects is { Count: > 0 } objects)
             {
                 await client.DeleteObjectsAsync(
                     new DeleteObjectsRequest
                     {
                         BucketName = _bucket,
-                        Objects = listResponse.S3Objects.Select(s3Object => new KeyVersion { Key = s3Object.Key }).ToList(),
+                        Objects = objects.Select(s3Object => new KeyVersion { Key = s3Object.Key }).ToList(),
                     },
                     cancellationToken).ConfigureAwait(false);
             }
@@ -467,14 +484,36 @@ public sealed class S3StorageBackend : IStorageBackend
             return _client;
         }
 
-        var config = new AmazonS3Config { RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_region) };
+        AmazonS3Config config;
         if (_serviceUrl is not null)
         {
-            // Solo lo usan las pruebas contra LocalStack: un endpoint de AWS real nunca
-            // necesita esto, ya lo resuelve RegionEndpoint.
-            config.ServiceURL = _serviceUrl;
-            config.ForcePathStyle = _forcePathStyle;
+            // Solo lo usan las pruebas contra LocalStack. No se fija también
+            // RegionEndpoint acá: confirmado contra un servidor real, el resolutor de
+            // endpoints del SDK v4 (con us-east-1 en particular, por su endpoint
+            // "global" legado) ignoraba ServiceURL y mandaba las peticiones a AWS real
+            // en vez de al contenedor cuando ambos estaban presentes. AuthenticationRegion
+            // alcanza para firmar la petición correctamente sin resolver un endpoint a
+            // partir de la región.
+            config = new AmazonS3Config
+            {
+                ServiceURL = _serviceUrl,
+                ForcePathStyle = _forcePathStyle,
+                AuthenticationRegion = _region,
+            };
         }
+        else
+        {
+            config = new AmazonS3Config { RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_region) };
+        }
+
+        // El SDK v4 agrega un checksum CRC32 a cada request por default (WHEN_SUPPORTED).
+        // Nuestro InitiateMultipartUploadRequest nunca declara ChecksumAlgorithm, así
+        // que un UploadPart que sí manda uno queda inconsistente con lo declarado al
+        // iniciar — confirmado contra un servidor real: "Checksum Type mismatch
+        // occurred, expected checksum Type: null, actual checksum Type: crc32". No
+        // diseñamos el resumen (ADR-027/031) alrededor de checksums, así que se vuelve
+        // al comportamiento previo a v4: calcular solo cuando la operación lo exige.
+        config.RequestChecksumCalculation = Amazon.Runtime.RequestChecksumCalculation.WHEN_REQUIRED;
 
         _client = new AmazonS3Client(_accessKeyId, _secretAccessKey, config);
         return _client;

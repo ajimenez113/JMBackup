@@ -4,6 +4,7 @@ using DotNet.Testcontainers.Containers;
 using FluentAssertions;
 using JMBackup.Application.Abstractions;
 using JMBackup.Domain.Enums;
+using JMBackup.Domain.Exceptions;
 using JMBackup.Storage.Remote;
 
 namespace JMBackup.Storage.Tests.Remote;
@@ -32,7 +33,12 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     private const int PassiveMinPort = 21100;
     private const int PassiveMaxPort = 21110;
     private const string Username = "jmbackup";
-    private const string Password = "una-contraseña-de-prueba";
+
+    // ASCII puro a propósito: una contraseña con "ñ" llegaba corrompida al servidor
+    // real (confirmado con curl en crudo, no era un bug de FluentFTP ni de
+    // FtpStorageBackend) — la codificación de una variable de entorno pasada a un
+    // contenedor Docker no está garantizada a preservar caracteres fuera de ASCII.
+    private const string Password = "una-contrasena-de-prueba-123";
 
     // Necesario para que el servidor anuncie una dirección alcanzable desde fuera del
     // contenedor en modo pasivo. host.docker.internal funciona en Docker Desktop
@@ -84,7 +90,7 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     [Fact]
     public async Task TestConnectionAsync_InvalidPassword_ReturnsInvalidCredentials()
     {
-        await using var backend = CreateBackend(password: "contraseña-incorrecta");
+        await using var backend = CreateBackend(password: "contrasena-incorrecta");
 
         var status = await backend.TestConnectionAsync(CancellationToken.None);
 
@@ -134,6 +140,11 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     public async Task ListAsync_ReturnsFilesWrittenToTheRoot()
     {
         await using var backend = CreateBackend();
+
+        // FluentFTP no crea directorios padre al subir (createRemoteDir: false):
+        // en producción es BackupEngine quien llama CreateDirectoryAsync antes de
+        // escribir cada archivo, así que la prueba tiene que hacer lo mismo.
+        await backend.CreateDirectoryAsync("listado", CancellationToken.None);
         await WriteAsync(backend, "listado/uno.txt", "1"u8.ToArray());
         await WriteAsync(backend, "listado/dos.txt", "2"u8.ToArray());
 
@@ -165,6 +176,12 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     /// archivo sin volver a mandar los bytes ya subidos. Se verifica por resultado
     /// (el archivo final es correcto) más que por bytes exactos retransmitidos, que
     /// FluentFTP no expone directamente.
+    ///
+    /// Contra un servidor real, FluentFTP intenta su propia reanudación interna ante
+    /// un IOException de la fuente (confirmado corriendo esta prueba con Docker) y
+    /// solo después de agotar esos reintentos internos devuelve FtpStatus.Failed, que
+    /// FtpStorageBackend traduce en StorageOperationException — nunca ve la
+    /// IOException cruda porque FluentFTP la absorbe puertas adentro.
     /// </summary>
     [Fact]
     public async Task WriteAsync_InterruptedThenRetried_ResumesAndProducesTheCompleteFile()
@@ -178,7 +195,7 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
         {
             var act = async () => await backend.WriteAsync(
                 "grande.bin", interruptingStream, content.Length, modifiedUtc, new Progress<TransferProgress>(), CancellationToken.None);
-            await act.Should().ThrowAsync<IOException>();
+            await act.Should().ThrowAsync<StorageOperationException>();
         }
 
         using var fullStream = new MemoryStream(content);
@@ -194,6 +211,11 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     /// el parcial y este, no se reanuda — se descarta y arranca de cero. Se prueba acá
     /// además de en <c>ResumeDecisionTests</c> porque acá se ejercita el camino real
     /// contra un servidor, no solo la función de decisión aislada.
+    ///
+    /// Igual que en <see cref="WriteAsync_InterruptedThenRetried_ResumesAndProducesTheCompleteFile"/>,
+    /// FluentFTP absorbe la IOException de la fuente con sus propios reintentos
+    /// internos y el fallo que finalmente ve FtpStorageBackend es un FtpStatus.Failed
+    /// traducido a StorageOperationException.
     /// </summary>
     [Fact]
     public async Task WriteAsync_SourceChangedAfterAPartialUpload_DoesNotResumeAndWritesTheNewContentCompletely()
@@ -207,7 +229,7 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
         {
             var act = async () => await backend.WriteAsync(
                 "cambia.bin", interruptingStream, firstContent.Length, firstModifiedUtc, new Progress<TransferProgress>(), CancellationToken.None);
-            await act.Should().ThrowAsync<IOException>();
+            await act.Should().ThrowAsync<StorageOperationException>();
         }
 
         var secondContent = new byte[50_000];
