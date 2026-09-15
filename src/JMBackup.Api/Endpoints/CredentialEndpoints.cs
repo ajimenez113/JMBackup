@@ -23,6 +23,21 @@ public static class CredentialEndpoints
             return Results.Created($"/api/credentials/{id}", entity.ToResponse());
         }).WithValidation<CredentialRequest>().Produces<CredentialResponse>(StatusCodes.Status201Created);
 
+        group.MapPut("/{id:int}", async (
+            int id, CredentialUpdateRequest request, ICredentialRepository repository, INetworkCredentialProtector protector,
+            CancellationToken cancellationToken) =>
+        {
+            var existing = await repository.FindAsync(id, cancellationToken).ConfigureAwait(false);
+            if (existing is null)
+            {
+                return Results.NotFound();
+            }
+
+            request.ApplyTo(existing, protector);
+            await repository.UpdateAsync(existing, cancellationToken).ConfigureAwait(false);
+            return Results.Ok(existing.ToResponse());
+        }).WithValidation<CredentialUpdateRequest>().Produces<CredentialResponse>().Produces(StatusCodes.Status404NotFound);
+
         group.MapDelete("/{id:int}", async (int id, ICredentialRepository repository, CancellationToken cancellationToken) =>
         {
             await repository.DeleteAsync(id, cancellationToken).ConfigureAwait(false);

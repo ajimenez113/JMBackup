@@ -26,7 +26,7 @@ public sealed class TaskPathEndpointsTests
         var antiforgeryToken = await GetAntiforgeryTokenAsync(client);
 
         var task = await CreateTaskAsync(client, antiforgeryToken, "Tarea con destino S3");
-        var credential = await CreateCredentialAsync(client, antiforgeryToken, "AWS", "AKIA-test", "secreto");
+        var credential = await CreateCredentialAsync(client, antiforgeryToken, "AWS", "S3", "AKIA-test", "secreto");
 
         var response = await PostPathAsync(client, antiforgeryToken, task!.Id, new TaskPathRequest(
             "Destination", "S3", "mi-bucket/prefijo", credential!.Id, Position: 0,
@@ -49,7 +49,7 @@ public sealed class TaskPathEndpointsTests
         var antiforgeryToken = await GetAntiforgeryTokenAsync(client);
 
         var task = await CreateTaskAsync(client, antiforgeryToken, "Tarea con destino FTP");
-        var credential = await CreateCredentialAsync(client, antiforgeryToken, "FTP1", "usuario", "secreto");
+        var credential = await CreateCredentialAsync(client, antiforgeryToken, "FTP1", "Ftp", "usuario", "secreto");
 
         var response = await PostPathAsync(client, antiforgeryToken, task!.Id, new TaskPathRequest(
             "Destination", "Ftp", "ftp.ejemplo.com:21/respaldos", credential!.Id, Position: 0,
@@ -84,7 +84,7 @@ public sealed class TaskPathEndpointsTests
         var antiforgeryToken = await GetAntiforgeryTokenAsync(client);
 
         var task = await CreateTaskAsync(client, antiforgeryToken, "Tarea S3 sin región");
-        var credential = await CreateCredentialAsync(client, antiforgeryToken, "AWS2", "AKIA-test2", "secreto");
+        var credential = await CreateCredentialAsync(client, antiforgeryToken, "AWS2", "S3", "AKIA-test2", "secreto");
 
         var response = await PostPathAsync(client, antiforgeryToken, task!.Id, new TaskPathRequest(
             "Destination", "S3", "mi-bucket", credential!.Id, Position: 0,
@@ -134,11 +134,11 @@ public sealed class TaskPathEndpointsTests
     }
 
     private static async Task<CredentialResponse?> CreateCredentialAsync(
-        HttpClient client, string antiforgeryToken, string alias, string username, string password)
+        HttpClient client, string antiforgeryToken, string alias, string backendType, string username, string password)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/credentials", UriKind.Relative))
         {
-            Content = JsonContent.Create(new CredentialRequest(alias, username, password)),
+            Content = JsonContent.Create(new CredentialRequest(alias, backendType, username, password)),
         };
         request.Headers.Add("X-XSRF-TOKEN", antiforgeryToken);
 

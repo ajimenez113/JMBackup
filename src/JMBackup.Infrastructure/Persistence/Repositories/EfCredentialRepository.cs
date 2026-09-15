@@ -28,6 +28,13 @@ public sealed class EfCredentialRepository(IDbContextFactory<JMBackupDbContext> 
         return credential.Id;
     }
 
+    public async Task UpdateAsync(Credential credential, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        dbContext.Credentials.Update(credential);
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);

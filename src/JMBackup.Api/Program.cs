@@ -103,6 +103,7 @@ builder.Services.AddScoped<IValidator<ExclusionRequest>, ExclusionRequestValidat
 builder.Services.AddScoped<IValidator<FilterRequest>, FilterRequestValidator>();
 builder.Services.AddScoped<IValidator<ScheduleRequest>, ScheduleRequestValidator>();
 builder.Services.AddScoped<IValidator<CredentialRequest>, CredentialRequestValidator>();
+builder.Services.AddScoped<IValidator<CredentialUpdateRequest>, CredentialUpdateRequestValidator>();
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
 builder.Services.AddScoped<IValidator<SecuritySettingsRequest>, SecuritySettingsRequestValidator>();
 builder.Services.AddScoped<IValidator<WebSettingsRequest>, WebSettingsRequestValidator>();

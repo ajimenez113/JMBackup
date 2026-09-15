@@ -10,5 +10,7 @@ public interface ICredentialRepository
 
     Task<int> CreateAsync(Credential credential, CancellationToken cancellationToken);
 
+    Task UpdateAsync(Credential credential, CancellationToken cancellationToken);
+
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }
