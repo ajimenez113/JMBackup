@@ -1,6 +1,7 @@
 import { Card } from '../../components/Card'
 import { Tabs } from '../../components/Tabs'
 import { useStrings } from '../../i18n'
+import { CredentialsSettingsTab } from './tabs/CredentialsSettingsTab'
 import { GeneralSettingsTab } from './tabs/GeneralSettingsTab'
 import { SecuritySettingsTab } from './tabs/SecuritySettingsTab'
 import { TransferSettingsTab } from './tabs/TransferSettingsTab'
@@ -16,6 +17,7 @@ export function SettingsPage() {
           items={[
             { value: 'general', label: strings.settings.tabGeneral, content: <GeneralSettingsTab /> },
             { value: 'transfer', label: strings.settings.tabTransfer, content: <TransferSettingsTab /> },
+            { value: 'credentials', label: strings.settings.tabCredentials, content: <CredentialsSettingsTab /> },
             { value: 'security', label: strings.settings.tabSecurity, content: <SecuritySettingsTab /> },
             { value: 'web', label: strings.settings.tabWeb, content: <WebSettingsTab /> },
           ]}

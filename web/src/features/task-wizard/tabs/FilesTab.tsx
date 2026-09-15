@@ -1,13 +1,27 @@
 import { useState } from 'react'
 import { Button } from '../../../components/Button'
 import { useStrings } from '../../../i18n'
-import type { CredentialResponse, TaskPathResponse } from '../../../lib/api-client'
+import type { CredentialResponse, TaskPathRequest, TaskPathResponse } from '../../../lib/api-client'
 import { useCredentials } from '../useCredentials'
 import { usePathCrud, usePaths } from '../usePaths'
-import { AddPathDialog } from './AddPathDialog'
+import { AddPathDialog, type NewPathInput } from './AddPathDialog'
 import { CredentialDialog } from './CredentialDialog'
 import { PathRow } from './PathRow'
 import { useConnectivityCheck } from './useConnectivityCheck'
+
+function toUpdateRequest(path: TaskPathResponse, credentialId: number | undefined): TaskPathRequest {
+  return {
+    role: path.role,
+    backendType: path.backendType,
+    path: path.path,
+    credentialId,
+    position: path.position,
+    encrypted: path.encrypted,
+    region: path.region,
+    storageClass: path.storageClass,
+    serverSideEncryption: path.serverSideEncryption,
+  }
+}
 
 interface PathSectionProps {
   taskId: number
@@ -15,7 +29,7 @@ interface PathSectionProps {
   title: string
   paths: TaskPathResponse[]
   credentials: CredentialResponse[]
-  onRequestNewCredential: (pathId: number) => void
+  onRequestNewCredential: (path: TaskPathResponse) => void
 }
 
 function PathSection({ taskId, role, title, paths, credentials, onRequestNewCredential }: PathSectionProps) {
@@ -24,6 +38,20 @@ function PathSection({ taskId, role, title, paths, credentials, onRequestNewCred
   const [dialogOpen, setDialogOpen] = useState(false)
   const pathIds = paths.map((path) => path.id)
   const connectivity = useConnectivityCheck(taskId, pathIds)
+
+  function handleAdd(input: NewPathInput) {
+    void add({
+      role,
+      backendType: input.backendType,
+      path: input.path,
+      credentialId: input.credentialId,
+      position: paths.length,
+      encrypted: input.encrypted,
+      region: input.region,
+      storageClass: input.storageClass,
+      serverSideEncryption: input.serverSideEncryption,
+    })
+  }
 
   return (
     <div className="flex-1">
@@ -44,19 +72,13 @@ function PathSection({ taskId, role, title, paths, credentials, onRequestNewCred
               connectivity={connectivity.get(path.id)}
               credentials={credentials}
               onRemove={() => void remove(path.id)}
-              onCredentialChange={(credentialId) =>
-                void update({ pathId: path.id, request: { role, path: path.path, credentialId, position: path.position } })
-              }
-              onRequestNewCredential={() => onRequestNewCredential(path.id)}
+              onCredentialChange={(credentialId) => void update({ pathId: path.id, request: toUpdateRequest(path, credentialId) })}
+              onRequestNewCredential={() => onRequestNewCredential(path)}
             />
           ))
         )}
       </div>
-      <AddPathDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onAdd={(path) => void add({ role, path, credentialId: undefined, position: paths.length })}
-      />
+      <AddPathDialog open={dialogOpen} onOpenChange={setDialogOpen} onAdd={handleAdd} />
     </div>
   )
 }
@@ -68,15 +90,14 @@ export function FilesTab({ taskId }: { taskId: number }) {
   const credentialsQuery = useCredentials()
   const credentials = credentialsQuery.data ?? []
   const { update } = usePathCrud(taskId)
-  const [credentialDialogPathId, setCredentialDialogPathId] = useState<number>()
+  const [credentialDialogPath, setCredentialDialogPath] = useState<TaskPathResponse>()
 
-  function handleCredentialCreated(credentialId: number) {
-    const path = paths.find((p) => p.id === credentialDialogPathId)
+  function handleCredentialSaved(credentialId: number) {
+    const path = credentialDialogPath
     if (path) {
-      const role = path.role as 'Source' | 'Destination'
-      void update({ pathId: path.id, request: { role, path: path.path, credentialId, position: path.position } })
+      void update({ pathId: path.id, request: toUpdateRequest(path, credentialId) })
     }
-    setCredentialDialogPathId(undefined)
+    setCredentialDialogPath(undefined)
   }
 
   return (
@@ -87,7 +108,7 @@ export function FilesTab({ taskId }: { taskId: number }) {
         title={strings.wizard.files.source}
         paths={paths.filter((path) => path.role === 'Source')}
         credentials={credentials}
-        onRequestNewCredential={setCredentialDialogPathId}
+        onRequestNewCredential={setCredentialDialogPath}
       />
       <PathSection
         taskId={taskId}
@@ -95,12 +116,13 @@ export function FilesTab({ taskId }: { taskId: number }) {
         title={strings.wizard.files.destination}
         paths={paths.filter((path) => path.role === 'Destination')}
         credentials={credentials}
-        onRequestNewCredential={setCredentialDialogPathId}
+        onRequestNewCredential={setCredentialDialogPath}
       />
       <CredentialDialog
-        open={credentialDialogPathId !== undefined}
-        onOpenChange={(open) => !open && setCredentialDialogPathId(undefined)}
-        onCreated={handleCredentialCreated}
+        open={credentialDialogPath !== undefined}
+        onOpenChange={(open) => !open && setCredentialDialogPath(undefined)}
+        onSaved={(credential) => handleCredentialSaved(credential.id)}
+        fixedBackendType={credentialDialogPath?.backendType}
       />
     </div>
   )

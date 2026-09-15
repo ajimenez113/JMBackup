@@ -18,6 +18,8 @@ const REASON_KEYS = {
   InvalidCredentials: 'reasonInvalidCredentials',
   UntrustedCertificate: 'reasonUntrustedCertificate',
   UnknownHostKey: 'reasonUnknownHostKey',
+  WrongRegion: 'reasonWrongRegion',
+  ObjectArchived: 'reasonObjectArchived',
 } as const
 
 interface PathRowProps {
@@ -34,7 +36,9 @@ export function PathRow({ path, connectivity, credentials, onRemove, onCredentia
 
   const credentialOptions = [
     { value: NO_CREDENTIAL_VALUE, label: strings.wizard.files.credentialNone },
-    ...credentials.map((credential) => ({ value: String(credential.id), label: credential.alias })),
+    ...credentials
+      .filter((credential) => credential.backendType === path.backendType)
+      .map((credential) => ({ value: String(credential.id), label: credential.alias })),
     { value: NEW_CREDENTIAL_VALUE, label: strings.wizard.files.credentialNew },
   ]
 
@@ -70,6 +74,9 @@ export function PathRow({ path, connectivity, credentials, onRemove, onCredentia
             <StatusDot status={status} />
           </span>
         </Tooltip>
+        {path.backendType !== 'Local' ? (
+          <span className="rounded-jm border border-border-subtle px-1.5 py-0.5 text-xs text-fg-muted">{path.backendType}</span>
+        ) : null}
         <span className="text-sm text-fg">{path.path}</span>
       </div>
       <div className="flex items-center gap-3">

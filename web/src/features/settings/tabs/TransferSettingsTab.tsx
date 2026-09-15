@@ -2,9 +2,15 @@ import { useEffect, useState } from 'react'
 import { Button } from '../../../components/Button'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
+import { Select } from '../../../components/Select'
 import { Switch } from '../../../components/Switch'
 import { useStrings } from '../../../i18n'
 import { useTransferSettings } from '../useSettings'
+
+const BYTES_PER_KB = 1024
+const KB_PER_MB = 1024
+
+type BandwidthUnit = 'KBs' | 'MBs'
 
 export function TransferSettingsTab() {
   const strings = useStrings()
@@ -12,6 +18,7 @@ export function TransferSettingsTab() {
 
   const [maxParallelTransfers, setMaxParallelTransfers] = useState('4')
   const [bandwidthLimit, setBandwidthLimit] = useState('')
+  const [bandwidthUnit, setBandwidthUnit] = useState<BandwidthUnit>('KBs')
   const [blockSize, setBlockSize] = useState('81920')
   const [preserveTimestamps, setPreserveTimestamps] = useState(true)
   const [savedNotice, setSavedNotice] = useState(false)
@@ -22,15 +29,30 @@ export function TransferSettingsTab() {
     }
 
     setMaxParallelTransfers(String(data.maxParallelTransfers))
-    setBandwidthLimit(data.globalBandwidthLimitBytesPerSecond ? String(data.globalBandwidthLimitBytesPerSecond) : '')
+    // Se guarda en bytes/s (RF-90); acá solo se ajusta la presentación. Si el valor
+    // guardado cae justo en un múltiplo de MB/s se muestra en esa unidad, para no
+    // mostrar un número innecesariamente grande apenas se reabre la pestaña.
+    const bytesPerSecond = data.globalBandwidthLimitBytesPerSecond
+    if (!bytesPerSecond) {
+      setBandwidthLimit('')
+      setBandwidthUnit('KBs')
+    } else {
+      const kbPerSecond = bytesPerSecond / BYTES_PER_KB
+      const isWholeMegabytes = kbPerSecond % KB_PER_MB === 0
+      setBandwidthUnit(isWholeMegabytes ? 'MBs' : 'KBs')
+      setBandwidthLimit(String(isWholeMegabytes ? kbPerSecond / KB_PER_MB : kbPerSecond))
+    }
     setBlockSize(String(data.blockSizeBytes))
     setPreserveTimestamps(data.preserveTimestampsAndAttributes)
   }, [data])
 
   async function handleSave() {
+    const enteredValue = bandwidthLimit ? Number(bandwidthLimit) : undefined
+    const kbPerSecond = enteredValue === undefined ? undefined : bandwidthUnit === 'MBs' ? enteredValue * KB_PER_MB : enteredValue
+
     await save({
       maxParallelTransfers: Number(maxParallelTransfers),
-      globalBandwidthLimitBytesPerSecond: bandwidthLimit ? Number(bandwidthLimit) : undefined,
+      globalBandwidthLimitBytesPerSecond: kbPerSecond === undefined ? undefined : kbPerSecond * BYTES_PER_KB,
       blockSizeBytes: Number(blockSize),
       preserveTimestampsAndAttributes: preserveTimestamps,
     })
@@ -51,12 +73,25 @@ export function TransferSettingsTab() {
         value={maxParallelTransfers}
         onChange={(event) => setMaxParallelTransfers(event.target.value)}
       />
-      <Input
-        type="number"
-        label={strings.settings.transfer.bandwidthLimit}
-        value={bandwidthLimit}
-        onChange={(event) => setBandwidthLimit(event.target.value)}
-      />
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <Input
+            type="number"
+            min={0}
+            label={strings.settings.transfer.bandwidthLimit}
+            value={bandwidthLimit}
+            onChange={(event) => setBandwidthLimit(event.target.value)}
+          />
+        </div>
+        <Select
+          value={bandwidthUnit}
+          onValueChange={(value) => setBandwidthUnit(value as BandwidthUnit)}
+          options={[
+            { value: 'KBs', label: strings.settings.transfer.bandwidthUnitKBs },
+            { value: 'MBs', label: strings.settings.transfer.bandwidthUnitMBs },
+          ]}
+        />
+      </div>
       <Input
         type="number"
         label={strings.settings.transfer.blockSize}
