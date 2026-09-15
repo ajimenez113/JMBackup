@@ -7,7 +7,7 @@ envuelve esa misma interfaz.
 
 El **hito 1** (fases 0 a 4: motor de copia local y SMB/UNC, planificación horaria,
 servicio de Windows, interfaz web e interfaz de escritorio) está completo. El
-**hito 2** está en marcha: destinos remotos (FTP construido; SFTP y S3, pendientes),
+**hito 2** está en marcha: destinos remotos (FTP y S3 construidos, sin exponer todavía en la interfaz; SFTP pendiente),
 planificación avanzada, acciones pre/post, tiempo real, multiequipo, correo,
 comparación tricolor y empaquetado — ver `docs/03-ROADMAP-HITO2.md` para el detalle
 fase por fase y qué está listo.

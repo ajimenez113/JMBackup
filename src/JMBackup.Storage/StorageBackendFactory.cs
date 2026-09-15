@@ -26,6 +26,7 @@ public sealed class StorageBackendFactory(TimeProvider timeProvider, INetworkCre
         {
             BackendType.Local => new LocalStorageBackend(path.Path, timeProvider),
             BackendType.Ftp => CreateFtp(path, credential),
+            BackendType.S3 => CreateS3(path, credential),
             _ => throw new NotSupportedException($"El backend {path.BackendType} todavía no está implementado."),
         };
     }
@@ -42,6 +43,34 @@ public sealed class StorageBackendFactory(TimeProvider timeProvider, INetworkCre
 
         return new FtpStorageBackend(
             host, port, remoteBasePath, credential.Username ?? string.Empty, password, path.Encrypted, DefaultAsciiExtensions, timeProvider);
+    }
+
+    private S3StorageBackend CreateS3(TaskPath path, Credential? credential)
+    {
+        if (credential is null)
+        {
+            throw new InvalidOperationException("Una ruta S3 necesita una credencial configurada.");
+        }
+
+        if (string.IsNullOrWhiteSpace(path.Region))
+        {
+            throw new InvalidOperationException("Una ruta S3 necesita una región configurada.");
+        }
+
+        var (bucket, prefix) = ParseS3Path(path.Path);
+        var accessKeyId = credential.Username ?? throw new InvalidOperationException("La credencial de S3 necesita el Access Key ID como usuario.");
+        var secretAccessKey = credentialProtector.Unprotect(credential.EncryptedSecret);
+
+        return new S3StorageBackend(
+            bucket, prefix, accessKeyId, secretAccessKey, path.Region, path.StorageClass, path.ServerSideEncryption, timeProvider);
+    }
+
+    /// <summary>"bucket/prefijo/opcional" → ("bucket", "prefijo/opcional"). El prefijo es opcional.</summary>
+    private static (string Bucket, string Prefix) ParseS3Path(string path)
+    {
+        var trimmed = path.TrimStart('/');
+        var firstSlash = trimmed.IndexOf('/');
+        return firstSlash < 0 ? (trimmed, string.Empty) : (trimmed[..firstSlash], trimmed[(firstSlash + 1)..]);
     }
 
     /// <summary>"host:puerto/ruta/remota" → (host, puerto, "ruta/remota"). El puerto es opcional (21 por defecto).</summary>

@@ -11,6 +11,8 @@ public sealed class TaskPathConfiguration : IEntityTypeConfiguration<TaskPath>
         builder.ToTable("TaskPaths");
         builder.HasKey(path => path.Id);
         builder.Property(path => path.Path).HasMaxLength(1024).IsRequired();
+        builder.Property(path => path.Region).HasMaxLength(64);
+        builder.Property(path => path.StorageClass).HasMaxLength(64);
         builder.HasIndex(path => path.TaskId);
 
         builder.HasOne<TaskDefinition>()

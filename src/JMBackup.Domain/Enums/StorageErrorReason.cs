@@ -19,4 +19,10 @@ public enum StorageErrorReason
 
     /// <summary>SFTP: la huella del servidor no coincide con la registrada, o es la primera conexión sin confirmar (fase 5, hito 2).</summary>
     UnknownHostKey = 7,
+
+    /// <summary>S3: el bucket existe, pero en una región distinta de la configurada (fase 5, hito 2).</summary>
+    WrongRegion = 8,
+
+    /// <summary>S3: el objeto está en Glacier o Glacier Deep Archive y no fue restaurado — no se puede leer sin pedir la restauración primero, que tarda horas (fase 5, hito 2).</summary>
+    ObjectArchived = 9,
 }
