@@ -143,25 +143,89 @@ public sealed class LocalStorageBackendTests : IDisposable
         freeSpace!.Value.Should().BeGreaterThan(0);
     }
 
-    [Fact]
-    public async Task TestConnectionAsync_ExistingRoot_IsConnected()
+    [Theory]
+    [InlineData(TaskPathRole.Source)]
+    [InlineData(TaskPathRole.Destination)]
+    public async Task TestConnectionAsync_ExistingRootWithNormalPermissions_IsConnected(TaskPathRole role)
     {
         var backend = CreateBackend();
 
-        var status = await backend.TestConnectionAsync(CancellationToken.None);
+        var status = await backend.TestConnectionAsync(role, CancellationToken.None);
 
         status.IsConnected.Should().BeTrue();
     }
 
-    [Fact]
-    public async Task TestConnectionAsync_MissingRoot_ReportsPathNotFound()
+    [Theory]
+    [InlineData(TaskPathRole.Source)]
+    [InlineData(TaskPathRole.Destination)]
+    public async Task TestConnectionAsync_MissingRoot_ReportsPathNotFound(TaskPathRole role)
     {
         var backend = new LocalStorageBackend(Path.Combine(_tempRoot.FullName, "no-existe"), _timeProvider);
 
-        var status = await backend.TestConnectionAsync(CancellationToken.None);
+        var status = await backend.TestConnectionAsync(role, CancellationToken.None);
 
         status.IsConnected.Should().BeFalse();
         status.Reason.Should().Be(StorageErrorReason.PathNotFound);
+    }
+
+    /// <summary>
+    /// Antes de esto, TestConnectionAsync solo confirmaba que la raíz EXISTE
+    /// (Directory.Exists) — el mismo permiso débil que llevó al escaneo silencioso en
+    /// cero de "Prueba Ale". Para un origen, ahora fuerza al menos un paso de
+    /// enumeración real, el mismo permiso que ListAsync necesita para escanear.
+    /// </summary>
+    [Fact]
+    public async Task TestConnectionAsync_SourceRoleWithoutListPermission_ReportsPermissionDenied()
+    {
+        var backend = CreateBackend();
+
+        DenyListDirectory(_tempRoot.FullName);
+        try
+        {
+            var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
+
+            status.IsConnected.Should().BeFalse();
+            status.Reason.Should().Be(StorageErrorReason.PermissionDenied);
+        }
+        finally
+        {
+            AllowFullControl(_tempRoot.FullName);
+        }
+    }
+
+    /// <summary>
+    /// Mismo criterio para el destino: existir no alcanza, hace falta poder escribir.
+    /// Se verifica creando y borrando un archivo de prueba real, no solo confiando en
+    /// que la carpeta exista.
+    /// </summary>
+    [Fact]
+    public async Task TestConnectionAsync_DestinationRoleWithoutWritePermission_ReportsPermissionDenied()
+    {
+        var backend = CreateBackend();
+
+        DenyWrite(_tempRoot.FullName);
+        try
+        {
+            var status = await backend.TestConnectionAsync(TaskPathRole.Destination, CancellationToken.None);
+
+            status.IsConnected.Should().BeFalse();
+            status.Reason.Should().Be(StorageErrorReason.PermissionDenied);
+        }
+        finally
+        {
+            AllowFullControl(_tempRoot.FullName);
+        }
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_DestinationRoleWithWritePermission_DoesNotLeaveTheProbeFileBehind()
+    {
+        var backend = CreateBackend();
+
+        var status = await backend.TestConnectionAsync(TaskPathRole.Destination, CancellationToken.None);
+
+        status.IsConnected.Should().BeTrue();
+        Directory.EnumerateFileSystemEntries(_tempRoot.FullName).Should().BeEmpty();
     }
 
     /// <summary>
@@ -218,6 +282,16 @@ public sealed class LocalStorageBackendTests : IDisposable
             System.Security.Principal.WindowsIdentity.GetCurrent().User!,
             System.Security.AccessControl.FileSystemRights.FullControl,
             System.Security.AccessControl.AccessControlType.Allow));
+        new DirectoryInfo(path).SetAccessControl(security);
+    }
+
+    private static void DenyWrite(string path)
+    {
+        var security = new System.Security.AccessControl.DirectorySecurity();
+        security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+            System.Security.AccessControl.FileSystemRights.CreateFiles | System.Security.AccessControl.FileSystemRights.WriteData,
+            System.Security.AccessControl.AccessControlType.Deny));
         new DirectoryInfo(path).SetAccessControl(security);
     }
 #pragma warning restore CA1416

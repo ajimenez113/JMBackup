@@ -71,7 +71,7 @@ public sealed class S3StorageBackendTests : IAsyncLifetime
     {
         await using var backend = CreateBackend();
 
-        var status = await backend.TestConnectionAsync(CancellationToken.None);
+        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
 
         status.IsConnected.Should().BeTrue();
     }
@@ -83,7 +83,7 @@ public sealed class S3StorageBackendTests : IAsyncLifetime
             "bucket-que-no-existe", string.Empty, AccessKeyId, SecretAccessKey, Region, null, false, _timeProvider,
             _container.GetConnectionString(), forcePathStyle: true);
 
-        var status = await backend.TestConnectionAsync(CancellationToken.None);
+        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
 
         status.IsConnected.Should().BeFalse();
         status.Reason.Should().Be(StorageErrorReason.PathNotFound);

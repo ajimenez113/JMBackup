@@ -1,3 +1,4 @@
+using FluentAssertions;
 using JMBackup.Application.Abstractions;
 using JMBackup.Application.Execution;
 using JMBackup.Application.Settings;
@@ -74,5 +75,70 @@ public sealed class TaskExecutionCoordinatorTests
                 && items[0].Status == RunItemStatus.Failed
                 && !string.IsNullOrWhiteSpace(items[0].ErrorMessage)),
             Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Antes de esto, una tarea que no encontraba NADA en el origen (ni un archivo
+    /// para copiar, saltear o mandar a la papelera) terminaba como RunStatus.Completed
+    /// — indistinguible de una corrida realmente exitosa. El usuario pidió un estado
+    /// propio para poder distinguir "no había nada que hacer" (revisar) de "estaba
+    /// todo al día" (éxito normal).
+    /// </summary>
+    [Fact]
+    public async Task RunTaskAsync_SourceHasNoFilesAtAll_ResultsInCompletedNoFilesStatus()
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+
+        var task = new TaskDefinition { Id = 1, Name = "Prueba", Enabled = true };
+        var taskRepository = Substitute.For<ITaskRepository>();
+        taskRepository.FindAsync(1, Arg.Any<CancellationToken>()).Returns(task);
+        taskRepository.GetPathsAsync(1, Arg.Any<CancellationToken>()).Returns(new List<TaskPath>
+        {
+            new() { Id = 1, TaskId = 1, Role = TaskPathRole.Source, Path = "origen", Position = 0 },
+            new() { Id = 2, TaskId = 1, Role = TaskPathRole.Destination, Path = "destino", Position = 0 },
+        });
+        taskRepository.GetExclusionsAsync(1, Arg.Any<CancellationToken>()).Returns(new List<Exclusion>());
+        taskRepository.GetFiltersAsync(1, Arg.Any<CancellationToken>()).Returns(new List<Filter>());
+
+        Run? capturedRun = null;
+        var runRepository = Substitute.For<IRunRepository>();
+        runRepository.CreateAsync(Arg.Any<Run>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedRun = callInfo.Arg<Run>();
+                capturedRun.GetType().GetProperty(nameof(Run.Id))!.SetValue(capturedRun, 99);
+                return 99;
+            });
+
+        var settingsStore = Substitute.For<ISettingsStore>();
+        settingsStore.GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((string?)null);
+
+        // Origen vacío a propósito: sin un solo archivo, ni siquiera para saltear.
+        var emptySource = new InMemoryStorageBackend(timeProvider);
+        var destination = new InMemoryStorageBackend(timeProvider);
+        var backendFactory = Substitute.For<IStorageBackendFactory>();
+        backendFactory.Create(Arg.Is<TaskPath>(p => p.Role == TaskPathRole.Source), Arg.Any<Credential?>()).Returns(emptySource);
+        backendFactory.Create(Arg.Is<TaskPath>(p => p.Role == TaskPathRole.Destination), Arg.Any<Credential?>()).Returns(destination);
+
+        var coordinator = new TaskExecutionCoordinator(
+            taskRepository,
+            runRepository,
+            Substitute.For<ICredentialRepository>(),
+            new SettingsService(settingsStore),
+            Substitute.For<INetworkCredentialProtector>(),
+            Substitute.For<INetworkShareConnector>(),
+            backendFactory,
+            Substitute.For<IFileIndexStore>(),
+            timeProvider,
+            new ActiveRunRegistry(),
+            Substitute.For<IProgressPublisher>(),
+            Substitute.For<ILogger<TaskExecutionCoordinator>>());
+
+        var result = await coordinator.RunTaskAsync(1, dryRun: false, CancellationToken.None);
+
+        result.Should().NotBeNull();
+        result!.Plan.Items.Should().BeEmpty();
+        await runRepository.Received(1).UpdateAsync(
+            Arg.Is<Run>(run => run.Status == RunStatus.CompletedNoFiles), Arg.Any<CancellationToken>());
     }
 }

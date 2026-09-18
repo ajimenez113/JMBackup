@@ -174,7 +174,7 @@ el motor entero.
 ```csharp
 public interface IStorageBackend : IAsyncDisposable
 {
-    Task<ConnectionStatus> TestConnectionAsync(CancellationToken ct);
+    Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken ct);
     IAsyncEnumerable<FileEntry> ListAsync(string path, bool recursive,
                                           CancellationToken ct);
     Task<FileEntry?> StatAsync(string path, CancellationToken ct);

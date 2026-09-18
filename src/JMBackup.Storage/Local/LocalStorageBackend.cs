@@ -34,16 +34,37 @@ public sealed class LocalStorageBackend : IStorageBackend
         _timeProvider = timeProvider;
     }
 
-    public Task<ConnectionStatus> TestConnectionAsync(CancellationToken cancellationToken)
+    public Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken)
     {
         try
         {
-            if (Directory.Exists(_root) || File.Exists(_root))
+            if (File.Exists(_root))
             {
                 return Task.FromResult(ConnectionStatus.Connected());
             }
 
-            return Task.FromResult(ConnectionStatus.Failed(StorageErrorReason.PathNotFound, $"La ruta \"{_root}\" no existe."));
+            if (!Directory.Exists(_root))
+            {
+                return Task.FromResult(ConnectionStatus.Failed(StorageErrorReason.PathNotFound, $"La ruta \"{_root}\" no existe."));
+            }
+
+            // Confirmar que la raíz EXISTE no alcanza (caso real: un origen sin
+            // permiso de LISTAR pasaba esta verificación con Directory.Exists y el
+            // escaneo devolvía cero archivos en silencio). Se fuerza el permiso real
+            // que hace falta según el rol: listado para origen, escritura para
+            // destino — "Leer y ejecutar" contra "Mostrar el contenido de la carpeta"
+            // o "Escribir" son permisos NTFS independientes entre sí.
+            if (role == TaskPathRole.Source)
+            {
+                using var enumerator = Directory.EnumerateFileSystemEntries(_root).GetEnumerator();
+                enumerator.MoveNext();
+            }
+            else
+            {
+                VerifyWritable();
+            }
+
+            return Task.FromResult(ConnectionStatus.Connected());
         }
         catch (UnauthorizedAccessException)
         {
@@ -53,6 +74,18 @@ public sealed class LocalStorageBackend : IStorageBackend
         {
             return Task.FromResult(ConnectionStatus.Failed(StorageErrorReason.HostUnreachable, ex.Message));
         }
+    }
+
+    /// <summary>
+    /// Crea y borra un archivo de prueba: es la única forma real de confirmar permiso
+    /// de escritura en NTFS/SMB sin esperar a que la primera transferencia real
+    /// fallara a mitad de un respaldo.
+    /// </summary>
+    private void VerifyWritable()
+    {
+        var probePath = Path.Combine(_root, $".jmbackup-permission-check-{Guid.NewGuid():N}.tmp");
+        File.WriteAllBytes(probePath, []);
+        File.Delete(probePath);
     }
 
     public async IAsyncEnumerable<FileEntry> ListAsync(string path, bool recursive, [EnumeratorCancellation] CancellationToken cancellationToken)

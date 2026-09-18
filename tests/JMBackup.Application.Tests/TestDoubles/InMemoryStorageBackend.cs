@@ -46,7 +46,7 @@ public sealed class InMemoryStorageBackend(TimeProvider timeProvider) : IStorage
     /// <summary>Deja de simular estancamiento en esta ruta: la próxima escritura se completa con normalidad.</summary>
     public void ClearStall(string path) => _stallingPaths.Remove(Normalize(path));
 
-    public Task<ConnectionStatus> TestConnectionAsync(CancellationToken cancellationToken) => Task.FromResult(
+    public Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken) => Task.FromResult(
         IsConnected ? ConnectionStatus.Connected() : ConnectionStatus.Failed(StorageErrorReason.HostUnreachable, "Desconectado (prueba)."));
 
     public async IAsyncEnumerable<FileEntry> ListAsync(string path, bool recursive, [EnumeratorCancellation] CancellationToken cancellationToken)

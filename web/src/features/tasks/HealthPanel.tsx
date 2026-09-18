@@ -12,7 +12,9 @@ interface HealthPanelProps {
 
 export function HealthPanel({ tasks, liveProgress }: HealthPanelProps) {
   const strings = useStrings()
-  const alerts = tasks.filter((task) => computeTaskHealth(task, liveProgress.get(task.id)).rpoAlert)
+  const alerts = tasks
+    .map((task) => ({ task, health: computeTaskHealth(task, liveProgress.get(task.id)) }))
+    .filter(({ health }) => health.rpoAlert)
 
   return (
     <Card title={strings.health.title} className="mb-4">
@@ -20,10 +22,10 @@ export function HealthPanel({ tasks, liveProgress }: HealthPanelProps) {
         <p className="text-sm text-fg-muted">{strings.health.allHealthy}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {alerts.map((task) => (
+          {alerts.map(({ task, health }) => (
             <li key={task.id} className="flex items-center justify-between gap-3 text-sm">
               <span className="flex items-center gap-2 text-fg">
-                <StatusDot status="warning" />
+                <StatusDot status={health.status} />
                 {task.name}
               </span>
               <span className="text-fg-muted">

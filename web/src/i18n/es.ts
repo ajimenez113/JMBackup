@@ -56,6 +56,7 @@ export const es = {
     statusWithErrors: 'Con errores',
     statusFailed: 'Falló',
     statusCancelled: 'Cancelada',
+    statusNoFiles: 'Sin archivos en el origen',
   },
   progress: {
     filesOk: 'archivos correctos',

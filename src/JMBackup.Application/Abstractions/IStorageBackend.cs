@@ -1,3 +1,5 @@
+using JMBackup.Domain.Enums;
+
 namespace JMBackup.Application.Abstractions;
 
 /// <summary>
@@ -23,7 +25,16 @@ namespace JMBackup.Application.Abstractions;
 /// </summary>
 public interface IStorageBackend : IAsyncDisposable
 {
-    Task<ConnectionStatus> TestConnectionAsync(CancellationToken cancellationToken);
+    /// <param name="role">
+    /// Confirmar que la raíz EXISTE no alcanza: un origen sin permiso de LISTAR su
+    /// contenido, o un destino sin permiso de ESCRIBIR en él, pueden confirmar
+    /// existencia igual y fallar recién durante el respaldo — o, peor, fallar en
+    /// silencio (ver <c>LocalStorageBackend</c>, caso real donde esto pasó). El rol
+    /// le dice a cada backend qué verificar de verdad: listado para
+    /// <see cref="TaskPathRole.Source"/>, escritura para
+    /// <see cref="TaskPathRole.Destination"/>.
+    /// </param>
+    Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken);
 
     /// <summary>
     /// Enumera el contenido de <paramref name="path"/> (relativo a la raíz). Las rutas

@@ -46,7 +46,7 @@ public sealed class BackupEngine(
 
         foreach (var backend in sourceBackends.Values)
         {
-            await EnsureConnectedAsync(backend, cancellationToken).ConfigureAwait(false);
+            await EnsureConnectedAsync(backend, TaskPathRole.Source, cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var backend in destinationBackends.Values)
@@ -55,7 +55,7 @@ public sealed class BackupEngine(
             // es lo normal en la primera corrida de una tarea nueva: se crea antes de
             // probar la conexión, en vez de tratarlo como un error de configuración.
             await backend.CreateDirectoryAsync(string.Empty, cancellationToken).ConfigureAwait(false);
-            await EnsureConnectedAsync(backend, cancellationToken).ConfigureAwait(false);
+            await EnsureConnectedAsync(backend, TaskPathRole.Destination, cancellationToken).ConfigureAwait(false);
         }
 
         var allItems = new List<PlannedItem>();
@@ -396,9 +396,9 @@ public sealed class BackupEngine(
         return false;
     }
 
-    private static async Task EnsureConnectedAsync(IStorageBackend backend, CancellationToken cancellationToken)
+    private static async Task EnsureConnectedAsync(IStorageBackend backend, TaskPathRole role, CancellationToken cancellationToken)
     {
-        var status = await backend.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var status = await backend.TestConnectionAsync(role, cancellationToken).ConfigureAwait(false);
         if (!status.IsConnected)
         {
             throw new StorageOperationException(

@@ -82,7 +82,7 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     {
         await using var backend = CreateBackend();
 
-        var status = await backend.TestConnectionAsync(CancellationToken.None);
+        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
 
         status.IsConnected.Should().BeTrue();
     }
@@ -92,7 +92,7 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     {
         await using var backend = CreateBackend(password: "contrasena-incorrecta");
 
-        var status = await backend.TestConnectionAsync(CancellationToken.None);
+        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
 
         status.IsConnected.Should().BeFalse();
         status.Reason.Should().Be(StorageErrorReason.InvalidCredentials);

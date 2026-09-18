@@ -11,14 +11,19 @@ import { useRuns, useTasksForFilter } from './useRuns'
 const STATUS_MAP: Record<string, Status> = {
   Completed: 'ok',
   CompletedWithErrors: 'warning',
+  CompletedNoFiles: 'attention',
   Failed: 'error',
   Cancelled: 'warning',
   Running: 'running',
 }
 
-const RESULT_LABEL_KEYS: Record<string, 'statusOk' | 'statusWithErrors' | 'statusFailed' | 'statusCancelled' | 'statusRunning'> = {
+const RESULT_LABEL_KEYS: Record<
+  string,
+  'statusOk' | 'statusWithErrors' | 'statusNoFiles' | 'statusFailed' | 'statusCancelled' | 'statusRunning'
+> = {
   Completed: 'statusOk',
   CompletedWithErrors: 'statusWithErrors',
+  CompletedNoFiles: 'statusNoFiles',
   Failed: 'statusFailed',
   Cancelled: 'statusCancelled',
   Running: 'statusRunning',

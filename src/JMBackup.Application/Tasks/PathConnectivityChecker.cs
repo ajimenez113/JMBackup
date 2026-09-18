@@ -33,7 +33,7 @@ public sealed class PathConnectivityChecker(
         try
         {
             await using var backend = backendFactory.Create(path, isUncCredential ? null : credential);
-            return await backend.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
+            return await backend.TestConnectionAsync(path.Role, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

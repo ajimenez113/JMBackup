@@ -18,6 +18,7 @@
   --jm-warning: #eab308;
   --jm-danger: #dc2626;
   --jm-idle: #94a3b8;
+  --jm-attention: #7c3aed;
 
   /* Tema claro (por defecto) */
   --jm-bg-canvas: #f5f6fa;
@@ -67,6 +68,7 @@
   --color-warning: var(--jm-warning);
   --color-danger: var(--jm-danger);
   --color-idle: var(--jm-idle);
+  --color-attention: var(--jm-attention);
 
   --radius-jm: var(--jm-radius);
   --shadow-jm: var(--jm-shadow);

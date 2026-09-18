@@ -67,7 +67,12 @@ public sealed class FtpStorageBackend : IStorageBackend
         _timeProvider = timeProvider;
     }
 
-    public async Task<ConnectionStatus> TestConnectionAsync(CancellationToken cancellationToken)
+    // TODO: igual que LocalStorageBackend antes de esta corrección, DirectoryExists
+    // solo confirma existencia, no que se pueda LISTAR (origen) ni ESCRIBIR
+    // (destino) — el mismo defecto, sin resolver todavía acá. Pendiente de
+    // confirmación junto con el catch de ListAsync que traga FtpCommandException
+    // (mismo hallazgo, ver auditoría de catches silenciosos).
+    public async Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken)
     {
         try
         {

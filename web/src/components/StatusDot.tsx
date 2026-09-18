@@ -1,4 +1,4 @@
-export type Status = 'ok' | 'warning' | 'error' | 'running' | 'idle'
+export type Status = 'ok' | 'warning' | 'error' | 'running' | 'idle' | 'attention'
 
 const STATUS_CLASSES: Record<Status, string> = {
   ok: 'bg-success',
@@ -6,6 +6,9 @@ const STATUS_CLASSES: Record<Status, string> = {
   error: 'bg-danger',
   running: 'bg-accent animate-pulse',
   idle: 'bg-idle',
+  // Ni éxito ni error: la tarea corrió pero el origen no tenía nada que respaldar.
+  // Color propio (violeta) para no confundirlo con "completado con errores" (ámbar).
+  attention: 'bg-attention',
 }
 
 interface StatusDotProps {

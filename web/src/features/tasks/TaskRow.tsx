@@ -18,6 +18,7 @@ interface TaskRowProps {
 const RESULT_LABEL_KEYS = {
   Completed: 'statusOk',
   CompletedWithErrors: 'statusWithErrors',
+  CompletedNoFiles: 'statusNoFiles',
   Failed: 'statusFailed',
   Cancelled: 'statusCancelled',
   Running: 'statusRunning',

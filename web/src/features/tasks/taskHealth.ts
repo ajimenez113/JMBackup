@@ -29,11 +29,18 @@ export function computeTaskHealth(task: TaskSummaryResponse, liveProgress: Progr
   }
 
   const lastRunFailed = task.lastRun.status === 'Failed' || task.lastRun.status === 'CompletedWithErrors'
+  // Corrió sin errores pero no encontró nada en el origen: no es un fallo, pero
+  // tampoco una copia exitosa — necesita revisión, igual que un RPO vencido.
+  const lastRunFoundNothing = task.lastRun.status === 'CompletedNoFiles'
   const missedNextRun = task.nextRunAtUtc !== undefined && new Date(task.nextRunAtUtc).getTime() < Date.now()
-  const rpoAlert = lastRunFailed || missedNextRun
+  const rpoAlert = lastRunFailed || lastRunFoundNothing || missedNextRun
 
   if (task.lastRun.status === 'Failed') {
     return { status: 'error', rpoAlert }
+  }
+
+  if (task.lastRun.status === 'CompletedNoFiles') {
+    return { status: 'attention', rpoAlert }
   }
 
   if (task.lastRun.status === 'CompletedWithErrors' || task.lastRun.status === 'Cancelled') {

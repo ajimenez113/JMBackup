@@ -125,7 +125,11 @@ public sealed class TaskExecutionCoordinator(
             if (!dryRun)
             {
                 run.FinishedAt = timeProvider.GetUtcNow();
-                run.Status = result.Errors.Count == 0 ? RunStatus.Completed : RunStatus.CompletedWithErrors;
+                run.Status = result.Errors.Count > 0
+                    ? RunStatus.CompletedWithErrors
+                    : result.Plan.Items.Count == 0
+                        ? RunStatus.CompletedNoFiles
+                        : RunStatus.Completed;
                 run.FilesOk = result.FilesCopied;
                 run.FilesFailed = result.Errors.Count;
                 run.FilesSkipped = result.FilesSkipped;
