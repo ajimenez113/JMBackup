@@ -1,6 +1,8 @@
 using JMBackup.Application.Abstractions;
 using JMBackup.Application.Scanning;
 using JMBackup.Domain.Enums;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JMBackup.Application.Backup;
 
@@ -9,8 +11,10 @@ namespace JMBackup.Application.Backup;
 /// <c>FileIndex</c> (RF-164) y, en modo espejo, detectando qué hay indexado para la
 /// tarea que ya no aparece en el origen (RF-73).
 /// </summary>
-public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndexStore)
+public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndexStore, ILogger? logger = null)
 {
+    private readonly ILogger _logger = logger ?? NullLogger.Instance;
+
     /// <param name="sourceBackends">Un backend por cada entrada de <see cref="BackupJobDefinition.SourcePaths"/>, ya conectado a esa raíz.</param>
     public async Task<BackupPlan> BuildAsync(
         BackupJobDefinition definition,
@@ -28,8 +32,10 @@ public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndex
         foreach (var sourceRoot in definition.SourcePaths)
         {
             var sourceBackend = sourceBackends[sourceRoot];
+            var toCopyForThisRoot = 0;
+            var toSkipForThisRoot = 0;
 
-            await foreach (var entry in scanner.ScanAsync(sourceBackend, scanOptions, cancellationToken))
+            await foreach (var entry in scanner.ScanAsync(sourceBackend, scanOptions, cancellationToken, sourceLabel: sourceRoot))
             {
                 var destinationRelativePath = RelativePathMapper.Map(sourceRoot, entry.Path, definition.AbsolutePaths);
                 seenRelativePaths.Add(destinationRelativePath);
@@ -42,6 +48,15 @@ public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndex
                     && indexEntry.Size == entry.Size
                     && indexEntry.ModifiedUtc == entry.ModifiedUtc;
 
+                if (isUpToDate)
+                {
+                    toSkipForThisRoot++;
+                }
+                else
+                {
+                    toCopyForThisRoot++;
+                }
+
                 items.Add(new PlannedItem
                 {
                     Kind = isUpToDate ? PlannedActionKind.Skip : PlannedActionKind.Copy,
@@ -53,6 +68,8 @@ public sealed class BackupPlanner(FileScanner scanner, IFileIndexStore fileIndex
                     ModifiedUtc = entry.ModifiedUtc,
                 });
             }
+
+            BackupPlannerLog.SourcePlanned(_logger, sourceRoot, destinationRoot, toCopyForThisRoot, toSkipForThisRoot);
         }
 
         if (definition.Mode == BackupMode.Mirror)

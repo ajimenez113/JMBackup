@@ -70,6 +70,7 @@ public sealed class LocalStorageBackend : IStorageBackend
         {
             cancellationToken.ThrowIfCancellationRequested();
             var currentDirectory = pending.Pop();
+            var isRootDirectory = string.Equals(currentDirectory, native, StringComparison.OrdinalIgnoreCase);
 
             IEnumerable<string> entries;
             try
@@ -78,6 +79,28 @@ public sealed class LocalStorageBackend : IStorageBackend
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or DirectoryNotFoundException)
             {
+                if (isRootDirectory)
+                {
+                    // TestConnectionAsync (Directory.Exists) solo confirma que la raíz
+                    // EXISTE, no que se pueda LISTAR — son permisos NTFS distintos ("Leer y
+                    // ejecutar" contra "Mostrar el contenido de la carpeta"). Sin esto, un
+                    // origen sin permiso de listado pasaba la verificación de conectividad
+                    // y el escaneo devolvía silenciosamente cero archivos: la tarea
+                    // terminaba en éxito, sin copiar nada y sin ningún error que lo explique
+                    // (bug real: diagnóstico de "Prueba Ale", tarea nueva con destino S3
+                    // que no copiaba nada, indicador de conectividad en verde). Para una
+                    // subcarpeta encontrada durante la recursión sí tiene sentido saltarla
+                    // y seguir con el resto — abortar todo el respaldo por una sola carpeta
+                    // bloqueada sería peor.
+                    throw new StorageOperationException(
+                        ex is UnauthorizedAccessException ? StorageErrorReason.PermissionDenied : StorageErrorReason.PathNotFound,
+                        path,
+                        ex is UnauthorizedAccessException
+                            ? $"Permiso denegado al listar el contenido de \"{currentDirectory}\"."
+                            : $"No se encontró \"{currentDirectory}\".",
+                        ex);
+                }
+
                 continue;
             }
 

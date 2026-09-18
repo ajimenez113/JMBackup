@@ -6,6 +6,8 @@ using JMBackup.Application.Scanning;
 using JMBackup.Domain.Entities;
 using JMBackup.Domain.Enums;
 using JMBackup.Domain.Exceptions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
 using Polly.CircuitBreaker;
 
@@ -20,9 +22,11 @@ public sealed class BackupEngine(
     FileScanner scanner,
     IFileIndexStore fileIndexStore,
     TimeProvider timeProvider,
-    PauseController pauseController)
+    PauseController pauseController,
+    ILogger? logger = null)
 {
-    private readonly BackupPlanner _planner = new(scanner, fileIndexStore);
+    private readonly ILogger _logger = logger ?? NullLogger.Instance;
+    private readonly BackupPlanner _planner = new(scanner, fileIndexStore, logger);
 
     /// <param name="sourceBackends">Un backend por cada <see cref="BackupJobDefinition.SourcePaths"/>, ya conectado.</param>
     /// <param name="destinationBackends">Un backend por cada <see cref="BackupJobDefinition.DestinationPaths"/>, ya conectado.</param>
@@ -62,6 +66,15 @@ public sealed class BackupEngine(
         }
 
         var combinedPlan = new BackupPlan { Items = allItems };
+
+        if (combinedPlan.Items.Count == 0)
+        {
+            // No es necesariamente un error (un origen genuinamente vacío es legítimo),
+            // pero una tarea que termina en éxito sin haber encontrado NADA que copiar,
+            // saltear o mandar a la papelera es lo bastante rara como para dejarla
+            // marcada — sin esto, se ve idéntica en el log a una corrida normal.
+            BackupEngineLog.PlanIsEmpty(_logger, definition.Name);
+        }
 
         if (dryRun)
         {

@@ -46,7 +46,10 @@ builder.Services
 builder.Host.UseSerilog((_, loggerConfiguration) => loggerConfiguration
     .MinimumLevel.Information()
     .Enrich.FromLogContext()
-    .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture)
+    // Con fecha, no solo hora: sin esto, la consola (o cualquier redirección de stdout
+    // que junte varios días, a diferencia del archivo JSON de abajo, que rota uno por
+    // día) vuelve ilegible cuál línea es de hoy y cuál de ayer.
+    .WriteTo.Console(outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}", formatProvider: CultureInfo.InvariantCulture)
     .WriteTo.File(
         new CompactJsonFormatter(),
         Path.Combine(paths.DataDirectory, "logs", "jmbackup-.json"),

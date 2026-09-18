@@ -105,10 +105,12 @@ public sealed class TaskExecutionCoordinator(
                 var backend = backendFactory.Create(path, credential);
                 var target = path.Role == TaskPathRole.Source ? sourceBackends : destinationBackends;
                 target[path.Path] = backend;
+
+                TaskExecutionLog.BackendResolved(logger, path.Role, path.BackendType, backend.GetType().Name, path.Path);
             }
 
-            var scanner = new FileScanner(timeProvider);
-            var engine = new BackupEngine(scanner, fileIndexStore, timeProvider, pauseController);
+            var scanner = new FileScanner(timeProvider, logger);
+            var engine = new BackupEngine(scanner, fileIndexStore, timeProvider, pauseController, logger);
             var progress = new Progress<BackupProgress>(reported => PublishProgressFireAndForget(taskId, run.Id, reported));
 
             var result = await engine

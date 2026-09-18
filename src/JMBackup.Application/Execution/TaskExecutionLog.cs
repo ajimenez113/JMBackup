@@ -1,3 +1,4 @@
+using JMBackup.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace JMBackup.Application.Execution;
@@ -18,6 +19,16 @@ internal static partial class TaskExecutionLog
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Tarea {TaskName} terminó en {Duration} ({CorrelationId})")]
     public static partial void TaskCompleted(ILogger logger, string taskName, TimeSpan duration, string correlationId);
+
+    // Diagnóstico agregado tras un caso real (tarea nueva, destino S3, "green" en el
+    // indicador de conectividad) donde una tarea terminaba en éxito sin copiar nada:
+    // sin esto, no había forma de confirmar desde el log qué backend se instanció de
+    // verdad para cada ruta.
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Ruta {Role} ({RequestedBackendType} → {ResolvedBackendType}): \"{Path}\"")]
+    public static partial void BackendResolved(
+        ILogger logger, TaskPathRole role, BackendType requestedBackendType, string resolvedBackendType, string path);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "La tarea {TaskName} falló inesperadamente ({CorrelationId})")]
     public static partial void TaskFailed(ILogger logger, Exception exception, string taskName, string correlationId);

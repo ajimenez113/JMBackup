@@ -164,6 +164,64 @@ public sealed class LocalStorageBackendTests : IDisposable
         status.Reason.Should().Be(StorageErrorReason.PathNotFound);
     }
 
+    /// <summary>
+    /// Reproduce el diagnóstico de "Prueba Ale": una tarea nueva con destino S3 que
+    /// terminaba en éxito sin copiar nada, indicador de conectividad en verde y sin
+    /// ningún error. Causa raíz: TestConnectionAsync (Directory.Exists) solo confirma
+    /// que la raíz EXISTE — "Leer y ejecutar" en NTFS — no que se pueda LISTAR su
+    /// contenido — "Mostrar el contenido de la carpeta", un permiso distinto. Antes de
+    /// la corrección, ListAsync tragaba la UnauthorizedAccessException con un
+    /// <c>continue</c> silencioso pensado para una subcarpeta bloqueada encontrada
+    /// durante la recursión, pero el mismo catch alcanzaba también a la raíz: el
+    /// escaneo devolvía cero archivos sin ningún indicio de por qué.
+    /// </summary>
+    [Fact]
+    public async Task ListAsync_RootDirectoryNotListable_ThrowsInsteadOfSilentlyReturningNoEntries()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_tempRoot.FullName, "archivo.txt"), "contenido");
+        var backend = CreateBackend();
+
+        DenyListDirectory(_tempRoot.FullName);
+        try
+        {
+            var act = async () =>
+            {
+                await foreach (var _ in backend.ListAsync(string.Empty, recursive: true, CancellationToken.None))
+                {
+                }
+            };
+
+            var assertion = await act.Should().ThrowAsync<StorageOperationException>();
+            assertion.Which.Reason.Should().Be(StorageErrorReason.PermissionDenied);
+        }
+        finally
+        {
+            AllowFullControl(_tempRoot.FullName);
+        }
+    }
+
+#pragma warning disable CA1416 // Solo se ejecuta en Windows — igual que el resto de esta clase, que ya asume NTFS/Win32.
+    private static void DenyListDirectory(string path)
+    {
+        var security = new System.Security.AccessControl.DirectorySecurity();
+        security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+            System.Security.AccessControl.FileSystemRights.ListDirectory,
+            System.Security.AccessControl.AccessControlType.Deny));
+        new DirectoryInfo(path).SetAccessControl(security);
+    }
+
+    private static void AllowFullControl(string path)
+    {
+        var security = new System.Security.AccessControl.DirectorySecurity();
+        security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+            System.Security.AccessControl.FileSystemRights.FullControl,
+            System.Security.AccessControl.AccessControlType.Allow));
+        new DirectoryInfo(path).SetAccessControl(security);
+    }
+#pragma warning restore CA1416
+
     [Fact]
     public async Task OpenReadAsync_FileLockedByAnotherHandle_ThrowsWithFileLockedReason()
     {

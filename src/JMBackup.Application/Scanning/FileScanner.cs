@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using JMBackup.Application.Abstractions;
 using JMBackup.Domain.Enums;
 using JMBackup.Domain.Exceptions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JMBackup.Application.Scanning;
 
@@ -15,15 +17,17 @@ namespace JMBackup.Application.Scanning;
 /// (ruta, tamaño, fecha) de los archivos que sobreviven el filtrado, nunca su
 /// contenido — para 500 000 archivos son unos pocos MB, no el árbol completo.
 /// </summary>
-public sealed class FileScanner(TimeProvider timeProvider)
+public sealed class FileScanner(TimeProvider timeProvider, ILogger? logger = null)
 {
     private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly ILogger _logger = logger ?? NullLogger.Instance;
 
     /// <summary>Recorre <paramref name="backend"/> completo, desde su raíz (ver <see cref="IStorageBackend"/>).</summary>
     public async IAsyncEnumerable<FileEntry> ScanAsync(
         IStorageBackend backend,
         ScanOptions options,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken,
+        string? sourceLabel = null)
     {
         ArgumentNullException.ThrowIfNull(backend);
         ArgumentNullException.ThrowIfNull(options);
@@ -33,9 +37,13 @@ public sealed class FileScanner(TimeProvider timeProvider)
 
         var priority = new List<FileEntry>();
         var rest = new List<FileEntry>();
+        var totalEntries = 0;
+        var filesConsidered = 0;
 
         await foreach (var entry in backend.ListAsync(string.Empty, options.IncludeSubfolders, cancellationToken))
         {
+            totalEntries++;
+
             if (entry.IsDirectory)
             {
                 // El motor solo copia archivos: las carpetas de destino se crean según
@@ -43,6 +51,8 @@ public sealed class FileScanner(TimeProvider timeProvider)
                 // aparece como segmento en la ruta de cada archivo que contiene.
                 continue;
             }
+
+            filesConsidered++;
 
             var included = filterEvaluator.IsIncluded(entry);
             if (!included && exclusionEvaluator.IsExcluded(entry))
@@ -52,6 +62,9 @@ public sealed class FileScanner(TimeProvider timeProvider)
 
             (filterEvaluator.IsPriority(entry) ? priority : rest).Add(entry);
         }
+
+        var filesSurvived = priority.Count + rest.Count;
+        FileScannerLog.ScanCompleted(_logger, sourceLabel ?? "(origen)", totalEntries, filesConsidered, filesSurvived);
 
         foreach (var entry in Sort(priority, options.OrderStrategy).Concat(Sort(rest, options.OrderStrategy)))
         {
