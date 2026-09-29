@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using JMBackup.Application.Abstractions;
 using JMBackup.Domain.Enums;
 using JMBackup.Domain.Exceptions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JMBackup.Storage.Local;
 
@@ -24,14 +26,16 @@ public sealed class LocalStorageBackend : IStorageBackend
 
     private readonly string _root;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger _logger;
 
-    public LocalStorageBackend(string root, TimeProvider timeProvider)
+    public LocalStorageBackend(string root, TimeProvider timeProvider, ILogger? logger = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _root = root.Replace('/', '\\').TrimEnd('\\');
         _timeProvider = timeProvider;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     public Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken)
@@ -166,8 +170,12 @@ public sealed class LocalStorageBackend : IStorageBackend
                 {
                     info = new FileInfo(entryPath);
                 }
-                catch (IOException)
+                catch (IOException ex)
                 {
+                    // Raro no es lo mismo que imposible (el archivo puede haber
+                    // desaparecido entre el listado del directorio y acá): se registra
+                    // con su motivo, no se descarta en silencio como antes.
+                    LocalStorageBackendLog.FileSkippedDuringScan(_logger, entryPath, ex.Message);
                     continue;
                 }
 

@@ -79,19 +79,32 @@ public sealed class S3StorageBackend : IStorageBackend
         _forcePathStyle = forcePathStyle;
     }
 
-    // TODO: HeadBucket confirma acceso al bucket, no necesariamente permiso de
-    // s3:ListBucket (origen) ni s3:PutObject (destino) sobre el prefijo real de esta
-    // ruta — una política de IAM puede otorgar uno sin el otro. Sin resolver todavía;
-    // a diferencia de LocalStorageBackend, acá una falla de permiso durante el
-    // escaneo/escritura no queda en silencio (ListAsync/WriteAsync no tragan la
-    // excepción), así que el riesgo es menor, pero el indicador de conectividad
-    // igual podría dar verde sobre algo que después falla.
     public async Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken)
     {
         try
         {
             var client = GetClient();
             await client.HeadBucketAsync(new HeadBucketRequest { BucketName = _bucket }, cancellationToken).ConfigureAwait(false);
+
+            // HeadBucket confirma acceso al bucket, no necesariamente s3:ListBucket
+            // (origen) ni s3:PutObject (destino) sobre el prefijo real de esta ruta —
+            // una política de IAM puede otorgar uno sin el otro. Mismo criterio que
+            // LocalStorageBackend: se confirma el permiso real que hace falta.
+            if (role == TaskPathRole.Source)
+            {
+                await client.ListObjectsV2Async(
+                    new ListObjectsV2Request { BucketName = _bucket, Prefix = CombineKey(string.Empty), MaxKeys = 1 },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                var probeKey = CombineKey($".jmbackup-permission-check-{Guid.NewGuid():N}.tmp");
+                await client.PutObjectAsync(
+                    new PutObjectRequest { BucketName = _bucket, Key = probeKey, ContentBody = string.Empty },
+                    cancellationToken).ConfigureAwait(false);
+                await client.DeleteObjectAsync(_bucket, probeKey, cancellationToken).ConfigureAwait(false);
+            }
+
             return ConnectionStatus.Connected();
         }
         catch (AmazonS3Exception ex)

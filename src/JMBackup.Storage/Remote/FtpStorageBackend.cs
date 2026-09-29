@@ -67,20 +67,31 @@ public sealed class FtpStorageBackend : IStorageBackend
         _timeProvider = timeProvider;
     }
 
-    // TODO: igual que LocalStorageBackend antes de esta corrección, DirectoryExists
-    // solo confirma existencia, no que se pueda LISTAR (origen) ni ESCRIBIR
-    // (destino) — el mismo defecto, sin resolver todavía acá. Pendiente de
-    // confirmación junto con el catch de ListAsync que traga FtpCommandException
-    // (mismo hallazgo, ver auditoría de catches silenciosos).
     public async Task<ConnectionStatus> TestConnectionAsync(TaskPathRole role, CancellationToken cancellationToken)
     {
         try
         {
             var client = await GetClientAsync(cancellationToken).ConfigureAwait(false);
             var exists = await client.DirectoryExists(_root, cancellationToken).ConfigureAwait(false);
-            return exists
-                ? ConnectionStatus.Connected()
-                : ConnectionStatus.Failed(StorageErrorReason.PathNotFound, $"La ruta \"{_root}\" no existe en el servidor.");
+            if (!exists)
+            {
+                return ConnectionStatus.Failed(StorageErrorReason.PathNotFound, $"La ruta \"{_root}\" no existe en el servidor.");
+            }
+
+            // DirectoryExists (un CWD puertas adentro) puede alcanzar con menos
+            // permiso que el que hace falta para listar o escribir de verdad — mismo
+            // criterio que LocalStorageBackend: se confirma el permiso real, no solo
+            // la existencia.
+            if (role == TaskPathRole.Source)
+            {
+                await client.GetListing(_root, FtpListOption.Auto, cancellationToken).ConfigureAwait(false);
+            }
+            else if (!await VerifyWritableAsync(client, cancellationToken).ConfigureAwait(false))
+            {
+                return ConnectionStatus.Failed(StorageErrorReason.PermissionDenied, $"Permiso denegado al escribir en \"{_root}\".");
+            }
+
+            return ConnectionStatus.Connected();
         }
         catch (FtpAuthenticationException)
         {
@@ -117,9 +128,19 @@ public sealed class FtpStorageBackend : IStorageBackend
         {
             items = await client.GetListing(remotePath, options, cancellationToken).ConfigureAwait(false);
         }
-        catch (FtpCommandException)
+        catch (FtpCommandException ex) when (IsPermissionDenied(ex))
         {
-            yield break;
+            // Sin la recursión de LocalStorageBackend (FluentFTP la resuelve puertas
+            // adentro en esta única llamada), cualquier ruta pedida ES la raíz a
+            // efectos prácticos — no hay "subcarpeta encontrada durante la
+            // recursión" que valga la pena saltear en silencio. Antes, cualquier
+            // fallo de listado devolvía cero archivos sin decir por qué (bug real,
+            // mismo patrón que la raíz de LocalStorageBackend.ListAsync).
+            throw new StorageOperationException(StorageErrorReason.PermissionDenied, path, $"Permiso denegado al listar \"{path}\".", ex);
+        }
+        catch (FtpCommandException ex)
+        {
+            throw new StorageOperationException(StorageErrorReason.Unknown, path, $"No se pudo listar \"{path}\": {ex.Message}", ex);
         }
 
         foreach (var item in items)
@@ -391,6 +412,30 @@ public sealed class FtpStorageBackend : IStorageBackend
 
     private string CombineRemote(string relativePath) =>
         string.IsNullOrEmpty(relativePath) ? _root : $"{_root.TrimEnd('/')}/{relativePath}";
+
+    /// <summary>
+    /// Única forma real de confirmar permiso de escritura: crear y borrar un archivo
+    /// de prueba, igual que <c>LocalStorageBackend</c>. Devuelve <c>false</c> en vez
+    /// de lanzar cuando la subida falla sin tirar excepción (<see cref="FtpStatus.Failed"/>,
+    /// el mismo caso que ya maneja <see cref="WriteAsync"/>), para que el llamador
+    /// arme el <see cref="ConnectionStatus"/> con el motivo correcto.
+    /// </summary>
+    private async Task<bool> VerifyWritableAsync(AsyncFtpClient client, CancellationToken cancellationToken)
+    {
+        var probePath = CombineRemote($".jmbackup-permission-check-{Guid.NewGuid():N}.tmp");
+        using var probeStream = new MemoryStream();
+        var status = await client
+            .UploadStream(probeStream, probePath, FtpRemoteExists.Overwrite, createRemoteDir: false, new Progress<FtpProgress>(), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (status == FtpStatus.Failed)
+        {
+            return false;
+        }
+
+        await client.DeleteFile(probePath, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
 
     private static string GetRelativeTo(string queriedRemotePath, string fullRemotePath)
     {

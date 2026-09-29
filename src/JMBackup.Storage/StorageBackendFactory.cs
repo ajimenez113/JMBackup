@@ -3,6 +3,7 @@ using JMBackup.Domain.Entities;
 using JMBackup.Domain.Enums;
 using JMBackup.Storage.Local;
 using JMBackup.Storage.Remote;
+using Microsoft.Extensions.Logging;
 
 namespace JMBackup.Storage;
 
@@ -13,7 +14,9 @@ namespace JMBackup.Storage;
 /// sí, y la reciben ya resuelta de la base — acá se descifra recién en el último
 /// momento, no antes.
 /// </summary>
-public sealed class StorageBackendFactory(TimeProvider timeProvider, INetworkCredentialProtector credentialProtector) : IStorageBackendFactory
+public sealed class StorageBackendFactory(
+    TimeProvider timeProvider, INetworkCredentialProtector credentialProtector, ILogger<LocalStorageBackend>? localLogger = null)
+    : IStorageBackendFactory
 {
     // TODO(fase 5): reemplazar por la lista configurable de RF-92 (pestaña
     // Transferencia) cuando esa pestaña exista. Por ahora, extensiones de texto
@@ -24,7 +27,7 @@ public sealed class StorageBackendFactory(TimeProvider timeProvider, INetworkCre
     {
         return path.BackendType switch
         {
-            BackendType.Local => new LocalStorageBackend(path.Path, timeProvider),
+            BackendType.Local => new LocalStorageBackend(path.Path, timeProvider, localLogger),
             BackendType.Ftp => CreateFtp(path, credential),
             BackendType.S3 => CreateS3(path, credential),
             _ => throw new NotSupportedException($"El backend {path.BackendType} todavía no está implementado."),

@@ -77,14 +77,36 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     private FtpStorageBackend CreateBackend(string remoteBasePath = "", string? password = null) =>
         new("127.0.0.1", ControlPort, remoteBasePath, Username, password ?? Password, encrypted: false, [], _timeProvider);
 
-    [Fact]
-    public async Task TestConnectionAsync_ValidCredentials_ReturnsConnected()
+    [Theory]
+    [InlineData(TaskPathRole.Source)]
+    [InlineData(TaskPathRole.Destination)]
+    public async Task TestConnectionAsync_ValidCredentials_ReturnsConnected(TaskPathRole role)
     {
         await using var backend = CreateBackend();
 
-        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
+        var status = await backend.TestConnectionAsync(role, CancellationToken.None);
 
         status.IsConnected.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// La verificación de escritura crea y borra un archivo de prueba real (mismo
+    /// criterio que LocalStorageBackend): confirma que no deja rastro en el listado.
+    /// </summary>
+    [Fact]
+    public async Task TestConnectionAsync_DestinationRole_DoesNotLeaveTheProbeFileBehind()
+    {
+        await using var backend = CreateBackend();
+
+        await backend.TestConnectionAsync(TaskPathRole.Destination, CancellationToken.None);
+
+        var entries = new List<string>();
+        await foreach (var entry in backend.ListAsync(string.Empty, recursive: false, CancellationToken.None))
+        {
+            entries.Add(entry.Path);
+        }
+
+        entries.Should().BeEmpty();
     }
 
     [Fact]
@@ -155,6 +177,30 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
         }
 
         entries.Should().BeEquivalentTo("uno.txt", "dos.txt");
+    }
+
+    /// <summary>
+    /// Antes de esto, cualquier FtpCommandException durante el listado (no solo
+    /// permiso denegado) devolvía cero archivos en silencio — sin la distinción
+    /// raíz/subcarpeta que tiene LocalStorageBackend (FluentFTP resuelve la
+    /// recursión puertas adentro en una sola llamada), así que cualquier ruta caía
+    /// en el mismo hueco. Se reproduce con un caso que un servidor FTP real rechaza
+    /// de verdad: pedir un listado sobre la ruta de un ARCHIVO, no una carpeta.
+    /// </summary>
+    [Fact]
+    public async Task ListAsync_ServerRejectsTheListing_ThrowsStorageOperationExceptionInsteadOfReturningNoEntries()
+    {
+        await using var backend = CreateBackend();
+        await WriteAsync(backend, "archivo.txt", "contenido"u8.ToArray());
+
+        var act = async () =>
+        {
+            await foreach (var _ in backend.ListAsync("archivo.txt", recursive: false, CancellationToken.None))
+            {
+            }
+        };
+
+        await act.Should().ThrowAsync<StorageOperationException>();
     }
 
     [Fact]

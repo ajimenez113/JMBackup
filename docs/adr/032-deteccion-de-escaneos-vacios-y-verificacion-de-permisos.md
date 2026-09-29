@@ -45,16 +45,37 @@ existe). Para `TaskPathRole.Destination`, confirma que puede **escribir**. En
   permiso de escritura en NTFS/SMB sin esperar a que la primera transferencia real
   fallara a mitad de un respaldo.
 
-`FtpStorageBackend` y `S3StorageBackend` reciben el parámetro nuevo por firma (para
-que la interfaz sea una sola), pero **todavía no lo usan**: siguen con su
-verificación de solo-existencia (`DirectoryExists`/`HeadBucketAsync`) — mismo defecto
-conceptual, con menor severidad práctica porque ninguno de los dos tiene un
-`ListAsync`/`WriteAsync` que trague la excepción resultante en silencio (S3 confirmado
-sin ningún `catch` alrededor de `ListObjectsV2Async`; FTP sí tiene un `catch
-(FtpCommandException) { yield break; }` en `ListAsync` que es el mismo patrón exacto
-de este ADR, todavía sin resolver — ver auditoría de catches silenciosos, pendiente de
-confirmación). Profundizar la verificación en FTP/S3 queda para cuando se resuelva ese
-catch, no separado.
+`FtpStorageBackend` y `S3StorageBackend` reciben el mismo tratamiento, una vez
+confirmada la auditoría de catches silenciosos:
+
+- **FTP**, origen: además de `DirectoryExists`, ahora llama `GetListing` sobre la
+  raíz — el mismo permiso que `ListAsync` necesita. Destino: sube y borra un archivo
+  de prueba (`UploadStream` + `DeleteFile`), devolviendo `PermissionDenied` si la
+  subida falla sin tirar excepción (`FtpStatus.Failed`, el mismo caso que ya maneja
+  `WriteAsync`).
+- **S3**, origen: además de `HeadBucketAsync` (que solo confirma acceso al bucket,
+  no `s3:ListBucket` sobre el prefijo real), llama `ListObjectsV2Async` con
+  `MaxKeys=1`. Destino: `PutObjectAsync` + `DeleteObjectAsync` de un objeto de
+  prueba — confirma `s3:PutObject`, que una política de IAM puede otorgar sin
+  otorgar lectura, o viceversa.
+
+`FtpStorageBackend.ListAsync` también se corrigió: el `catch (FtpCommandException)
+{ yield break; }` que devolvía cero archivos en silencio ante *cualquier* falla de
+listado (no solo permiso denegado) ahora traduce la excepción a
+`StorageOperationException` con el motivo — `PermissionDenied` para los códigos ya
+reconocidos como tales (`IsPermissionDenied`), `Unknown` con el mensaje original para
+el resto. A diferencia de `LocalStorageBackend`, acá no hay distinción
+raíz/subcarpeta: FluentFTP resuelve la recursión puertas adentro en una sola llamada,
+así que cualquier ruta pedida es, a efectos prácticos, "la raíz" de esa invocación.
+
+`LocalStorageBackend.ListAsync` tenía un segundo catch del mismo patrón, más acotado:
+al construir `FileInfo` para un archivo encontrado, un `IOException` (por ejemplo, el
+archivo desapareció entre el listado del directorio y este punto) se descartaba en
+silencio. Ahora se registra con `ILogger` (nivel *warning*, motivo incluido) antes de
+saltarlo — "raro no es lo mismo que imposible". El logger llega opcional por
+constructor (`ILogger? logger = null`, `NullLogger` si no se pasa ninguno) para no
+romper los dobles de prueba existentes; `StorageBackendFactory` ya lo resuelve por DI
+y se lo pasa.
 
 ### 2. `RunStatus.CompletedNoFiles`
 
@@ -110,9 +131,13 @@ normales.
   abierta (mismo intervalo que ya usaba RF-22). Costo aceptado: es el mismo orden de
   magnitud que cualquier transferencia real, y es la única forma de que el semáforo
   verde signifique lo que dice.
-- FTP y S3 quedan con la misma verificación débil (solo existencia) que Local tenía
-  antes de este ADR — documentado como pendiente en el código (comentarios `TODO`) y
-  en este ADR, no simulado ni olvidado en silencio.
+- El indicador de conectividad para FTP y S3 ahora también escribe (y borra) un
+  archivo/objeto de prueba real en el destino cada 60 segundos mientras la pestaña
+  Archivos está abierta — mismo costo aceptado que en Local.
+- Los archivos/objetos de prueba (`.jmbackup-permission-check-<guid>.tmp`) se crean y
+  borran en la misma llamada; un fallo de borrado después de una subida exitosa
+  (poco probable, pero posible) podría dejar uno atrás. Igual que el equivalente en
+  Local: riesgo aceptado, no hay una forma más liviana de confirmar escritura real.
 - `RunStatus` gana un quinto valor. No es un cambio de esquema (se guarda como
   entero); sí es un valor nuevo que toda lectura de `Run.Status` en la interfaz tiene
   que reconocer explícitamente — `computeTaskHealth`, `HistoryPage`, `TaskRow` ya lo

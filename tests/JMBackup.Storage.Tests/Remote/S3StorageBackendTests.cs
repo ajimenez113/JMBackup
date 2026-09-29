@@ -66,14 +66,38 @@ public sealed class S3StorageBackendTests : IAsyncLifetime
         new(BucketName, basePrefix, AccessKeyId, SecretAccessKey, Region, storageClass, serverSideEncryption, _timeProvider,
             _container.GetConnectionString(), forcePathStyle: true);
 
-    [Fact]
-    public async Task TestConnectionAsync_ValidBucket_ReturnsConnected()
+    [Theory]
+    [InlineData(TaskPathRole.Source)]
+    [InlineData(TaskPathRole.Destination)]
+    public async Task TestConnectionAsync_ValidBucket_ReturnsConnected(TaskPathRole role)
     {
         await using var backend = CreateBackend();
 
-        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
+        var status = await backend.TestConnectionAsync(role, CancellationToken.None);
 
         status.IsConnected.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// HeadBucket confirma acceso al bucket, no necesariamente s3:ListBucket ni
+    /// s3:PutObject sobre el prefijo real — se agrega la verificación real por rol
+    /// (mismo criterio que LocalStorageBackend). Acá se confirma que la verificación
+    /// de escritura no deja el objeto de prueba atrás.
+    /// </summary>
+    [Fact]
+    public async Task TestConnectionAsync_DestinationRole_DoesNotLeaveTheProbeObjectBehind()
+    {
+        await using var backend = CreateBackend("verificacion-escritura");
+
+        await backend.TestConnectionAsync(TaskPathRole.Destination, CancellationToken.None);
+
+        var entries = new List<string>();
+        await foreach (var entry in backend.ListAsync(string.Empty, recursive: true, CancellationToken.None))
+        {
+            entries.Add(entry.Path);
+        }
+
+        entries.Should().BeEmpty();
     }
 
     [Fact]
