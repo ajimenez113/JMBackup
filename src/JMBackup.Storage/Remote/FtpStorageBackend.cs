@@ -84,7 +84,16 @@ public sealed class FtpStorageBackend : IStorageBackend
             // la existencia.
             if (role == TaskPathRole.Source)
             {
-                await client.GetListing(_root, FtpListOption.Auto, cancellationToken).ConfigureAwait(false);
+                // GetListing no tira excepción en todos los casos de permiso
+                // denegado (confirmado contra un servidor real, ver
+                // IsUnreadableDirectoryFallback en ListAsync) — mismo chequeo acá,
+                // para que el indicador de conectividad no dé verde sobre una
+                // raíz que existe pero no se puede leer de verdad.
+                var items = await client.GetListing(_root, FtpListOption.Auto, cancellationToken).ConfigureAwait(false);
+                if (IsUnreadableDirectoryFallback(items, _root))
+                {
+                    return ConnectionStatus.Failed(StorageErrorReason.PermissionDenied, $"Permiso denegado al listar el contenido de \"{_root}\".");
+                }
             }
             else if (!await VerifyWritableAsync(client, cancellationToken).ConfigureAwait(false))
             {
@@ -141,6 +150,21 @@ public sealed class FtpStorageBackend : IStorageBackend
         catch (FtpCommandException ex)
         {
             throw new StorageOperationException(StorageErrorReason.Unknown, path, $"No se pudo listar \"{path}\": {ex.Message}", ex);
+        }
+
+        if (IsUnreadableDirectoryFallback(items, remotePath))
+        {
+            // GetListing no siempre tira FtpCommandException cuando MLSD/LIST
+            // fallan contra un servidor real (confirmado con vsftpd: "d--x------",
+            // la raíz existe y se puede atravesar pero no leer — el mismo permiso
+            // asimétrico del bug de LocalStorageBackend, solo que en FTP no hay
+            // excepción que atrapar). FluentFTP cae a describir la ruta pedida
+            // como si fuera SU PROPIO hijo (FullName = ruta + "/" + nombre de la
+            // ruta) en vez de fallar — sin este chequeo, el escaneo ve "una
+            // subcarpeta" (a sí misma) y la descarta como directorio, terminando
+            // en cero archivos, otra vez en silencio.
+            throw new StorageOperationException(
+                StorageErrorReason.PermissionDenied, path, $"Permiso denegado al listar el contenido de \"{path}\".");
         }
 
         foreach (var item in items)
@@ -449,6 +473,34 @@ public sealed class FtpStorageBackend : IStorageBackend
     {
         var lastSlash = remotePath.LastIndexOf('/');
         return lastSlash <= 0 ? null : remotePath[..lastSlash];
+    }
+
+    /// <summary>
+    /// Detecta el "fallback" de FluentFTP cuando MLSD/LIST no devuelven contenido real
+    /// (confirmado contra un servidor real: un directorio con permiso de atravesar pero
+    /// no de leer — "d--x------" — no tira excepción, pero <c>GetListing</c> describe la
+    /// ruta pedida como si fuera SU PROPIO hijo): exactamente un resultado, de tipo
+    /// directorio, cuya ruta completa es la ruta pedida más su propio nombre otra vez
+    /// (<c>remotePath + "/" + nombre-de-remotePath</c>). Un directorio real con un solo
+    /// hijo que además se llame igual que su padre produciría el mismo patrón — un falso
+    /// positivo posible pero deliberadamente aceptado: preferible un error ruidoso a un
+    /// escaneo que descarta en silencio.
+    /// </summary>
+    private static bool IsUnreadableDirectoryFallback(FtpListItem[] items, string remotePath)
+    {
+        if (items.Length != 1 || items[0].Type != FtpObjectType.Directory)
+        {
+            return false;
+        }
+
+        var leafName = remotePath[(remotePath.LastIndexOf('/') + 1)..];
+        if (leafName.Length == 0)
+        {
+            return false;
+        }
+
+        var expectedSelfReference = $"{remotePath.TrimEnd('/')}/{leafName}";
+        return items[0].FullName.Equals(expectedSelfReference, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

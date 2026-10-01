@@ -77,6 +77,34 @@ constructor (`ILogger? logger = null`, `NullLogger` si no se pasa ninguno) para 
 romper los dobles de prueba existentes; `StorageBackendFactory` ya lo resuelve por DI
 y se lo pasa.
 
+### 1.1. FTP: `GetListing` no tira excepción ante un directorio sin permiso de lectura
+
+La corrida real contra un contenedor `fauria/vsftpd` (confirmada recién, Docker no
+arrancaba en la máquina de desarrollo hasta ahora) mostró que el arreglo de
+`FtpStorageBackend.ListAsync` descrito arriba — traducir `FtpCommandException` a
+`StorageOperationException` — **no alcanza**. Un directorio real con `chmod 100`
+(atravesable, no listable — el equivalente Unix exacto de la asimetría NTFS que
+causó el bug original) no hace que `GetListing` tire excepción: FluentFTP degrada en
+silencio, describiendo la ruta PEDIDA como si fuera su propio único hijo (pedir
+`/restringido` devuelve un item: `Name=restringido,
+FullName=/restringido/restringido, Type=Directory`). `ListAsync` lo recibía como "una
+subcarpeta más" y seguía sin copiar nada — el mismo bug original, por un mecanismo
+distinto al que el primer arreglo cubría.
+
+Confirmado con un programa de diagnóstico aparte (no parte del repo) que referencia
+la clase real `FtpStorageBackend` contra el mismo contenedor, antes de tocar
+producción.
+
+Arreglo: `IsUnreadableDirectoryFallback(FtpListItem[] items, string remotePath)`
+detecta esta firma específica (un solo item, de tipo directorio, cuyo `FullName`
+coincide con `remotePath` + "/" + su propio nombre final) y la trata como
+`StorageErrorReason.PermissionDenied`, tanto en `ListAsync` (tira
+`StorageOperationException`) como en `TestConnectionAsync` para `TaskPathRole.Source`
+(devuelve `ConnectionStatus.Failed`). Riesgo aceptado y deliberado: un directorio real
+cuyo único hijo se llamara igual que el propio directorio produciría un falso
+positivo — se prefiere ese falso positivo (ruidoso, visible, se puede reportar como
+bug) a un falso negativo (silencioso, indistinguible de "no hay nada que respaldar").
+
 ### 2. `RunStatus.CompletedNoFiles`
 
 Un `Run` cuyo plan queda completamente vacío (cero para copiar, cero al día, cero para

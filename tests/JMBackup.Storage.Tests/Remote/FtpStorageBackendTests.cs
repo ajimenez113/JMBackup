@@ -24,13 +24,8 @@ namespace JMBackup.Storage.Tests.Remote;
 /// Etiquetada "Docker" y excluida del "dotnet test" normal (ver README): sin Docker
 /// corriendo, Testcontainers no falla rápido al intentar levantar el contenedor — se
 /// queda esperando indefinidamente, colgando toda la corrida en vez de solo esta
-/// clase. Correr explícitamente con "dotnet test --filter Category=Docker".
-///
-/// ⚠️ DEUDA PENDIENTE (ver README): esta clase no corrió contra un contenedor real
-/// desde los commits 448f741/cad154b (verificación de permisos en
-/// TestConnectionAsync, ListAsync ya no traga fallos de listado en silencio) — la
-/// máquina de desarrollo no tenía soporte de virtualización. Ningún cambio nuevo a
-/// FtpStorageBackend se da por terminado sin correr esta suite primero.
+/// clase. Correr explícitamente con "dotnet test --filter Category=Docker". Ningún
+/// cambio nuevo a FtpStorageBackend se da por terminado sin correr esta suite primero.
 /// </summary>
 [Trait("Category", "Docker")]
 public sealed class FtpStorageBackendTests : IAsyncLifetime
@@ -186,27 +181,70 @@ public sealed class FtpStorageBackendTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Antes de esto, cualquier FtpCommandException durante el listado (no solo
-    /// permiso denegado) devolvía cero archivos en silencio — sin la distinción
-    /// raíz/subcarpeta que tiene LocalStorageBackend (FluentFTP resuelve la
-    /// recursión puertas adentro en una sola llamada), así que cualquier ruta caía
-    /// en el mismo hueco. Se reproduce con un caso que un servidor FTP real rechaza
-    /// de verdad: pedir un listado sobre la ruta de un ARCHIVO, no una carpeta.
+    /// Antes de esto, un directorio que EXISTE pero no se puede LEER devolvía cero
+    /// archivos en silencio. Confirmado contra un servidor real: GetListing NO tira
+    /// FtpCommandException en este caso (a diferencia de lo que se asumió al
+    /// principio) — cae a describir la ruta pedida como si fuera su propio hijo
+    /// ("/restringido/restringido"), y el escaneo la descarta como "una
+    /// subcarpeta más" sin darse cuenta de que es un permiso denegado. Por eso se
+    /// reproduce con un chmod real sobre el directorio dentro del contenedor
+    /// (atravesar sí, leer no — "d--x------", la misma asimetría que causó el bug
+    /// original en LocalStorageBackend), no con una ruta inexistente o un archivo:
+    /// ninguna de esas dos sí lanza una excepción real contra vsftpd.
     /// </summary>
     [Fact]
-    public async Task ListAsync_ServerRejectsTheListing_ThrowsStorageOperationExceptionInsteadOfReturningNoEntries()
+    public async Task ListAsync_DirectoryExistsButCannotBeRead_ThrowsStorageOperationExceptionInsteadOfReturningNoEntries()
     {
         await using var backend = CreateBackend();
-        await WriteAsync(backend, "archivo.txt", "contenido"u8.ToArray());
+        await backend.CreateDirectoryAsync("restringido", CancellationToken.None);
+        await DenyReadPermissionAsync("restringido");
 
         var act = async () =>
         {
-            await foreach (var _ in backend.ListAsync("archivo.txt", recursive: false, CancellationToken.None))
+            await foreach (var _ in backend.ListAsync("restringido", recursive: false, CancellationToken.None))
             {
             }
         };
 
         await act.Should().ThrowAsync<StorageOperationException>();
+    }
+
+    /// <summary>
+    /// Mismo caso real, pero cuando la raíz CONFIGURADA del backend es la que no se
+    /// puede leer — exactamente el diagnóstico original ("Prueba Ale"): el
+    /// indicador de conectividad (RF-22) daba verde sobre un origen que existía
+    /// pero no se podía escanear.
+    /// </summary>
+    [Fact]
+    public async Task TestConnectionAsync_SourceRoleRootExistsButCannotBeRead_ReportsPermissionDenied()
+    {
+        await using (var rootBackend = CreateBackend())
+        {
+            await rootBackend.CreateDirectoryAsync("restringido-raiz", CancellationToken.None);
+        }
+
+        await DenyReadPermissionAsync("restringido-raiz");
+
+        await using var backend = CreateBackend("restringido-raiz");
+        var status = await backend.TestConnectionAsync(TaskPathRole.Source, CancellationToken.None);
+
+        status.IsConnected.Should().BeFalse();
+        status.Reason.Should().Be(StorageErrorReason.PermissionDenied);
+    }
+
+    /// <summary>
+    /// Deniega el permiso real de LECTURA sobre un directorio dentro del
+    /// contenedor (chmod 100: se puede atravesar pero no listar) — reproduce
+    /// contra un servidor FTP real la misma asimetría de permisos del bug
+    /// original de LocalStorageBackend. fauria/vsftpd resuelve el usuario FTP a
+    /// un usuario "virtual" encadenado (chroot) en /home/vsftpd/&lt;usuario&gt;,
+    /// así que la ruta real en disco no es la ruta FTP tal cual.
+    /// </summary>
+    private async Task DenyReadPermissionAsync(string relativeRemotePath)
+    {
+        var realPath = $"/home/vsftpd/{Username}/{relativeRemotePath}";
+        var result = await _container.ExecAsync(["sh", "-c", $"chmod 100 {realPath}"]);
+        result.ExitCode.Should().Be(0, $"no se pudo restringir el permiso real de \"{realPath}\" dentro del contenedor: {result.Stderr}");
     }
 
     [Fact]

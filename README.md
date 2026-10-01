@@ -100,20 +100,14 @@ corriendo, ejecutalas aparte:
 dotnet test JMBackup.sln --filter "Category=Docker"
 ```
 
-> **⚠️ Deuda pendiente (2026-10-01):** los commits `448f741` y `cad154b` (verificación
-> real de permisos en `TestConnectionAsync`, corrección de `FtpStorageBackend.ListAsync`
-> para que no trague fallos de listado en silencio) **no se corrieron contra Docker** —
-> la máquina de desarrollo no tiene el soporte de virtualización que Docker Desktop
-> necesita. Hasta que esto se resuelva y la corrida real se confirme (y se borre este
-> aviso):
-> - **Ningún cambio nuevo a `FtpStorageBackend` o `S3StorageBackend` se da por
->   terminado sin correr `dotnet test --filter "Category=Docker"` primero** — la
->   regla de siempre (ADR-014 y toda la fase 5), reafirmada acá porque el bug de
->   `ListAsync` que motivó estos commits salía exactamente de no haberla seguido.
-> - Las 22 pruebas de `FtpStorageBackendTests`/`S3StorageBackendTests` (incluidas las
->   nuevas: `ListAsync_ServerRejectsTheListing_...`,
->   `TestConnectionAsync_DestinationRole_DoesNotLeaveTheProbe*Behind`) compilan pero
->   no corrieron ni una vez contra un contenedor real desde que se escribieron.
+> **Ningún cambio nuevo a `FtpStorageBackend` o `S3StorageBackend` se da por
+> terminado sin correr `dotnet test --filter "Category=Docker"` primero** (ADR-014 y
+> toda la fase 5). La corrida real contra Docker (2026-10-01) encontró que el primer
+> arreglo de `ListAsync` (traducir `FtpCommandException` a `StorageOperationException`)
+> no alcanzaba: contra un vsftpd real, un directorio sin permiso de lectura pero
+> atravesable no lanza excepción — `GetListing` degrada en silencio a un listado de un
+> solo item que describe la propia ruta pedida como si fuera su hijo. Ver
+> `IsUnreadableDirectoryFallback` en `FtpStorageBackend.cs` y ADR-032.
 
 ## Usar el motor desde la línea de comandos
 
