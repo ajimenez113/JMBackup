@@ -195,6 +195,21 @@ En `Directory.Build.props`, para **todos** los proyectos:
 - **Patrón `Result<T>` para fallos esperados** (archivo bloqueado, credencial
   inválida, host inalcanzable). Las excepciones se reservan para lo excepcional.
   Nunca `catch { }` vacío.
+- **Todo `catch` que suprime una excepción (la trata con un `continue`, un
+  `return` temprano, o cualquier otra forma de "seguir como si no hubiera
+  pasado") tiene que dejar rastro de que pasó: un log, un contador de omitidos,
+  o un estado del `Run` que el usuario vea.** No alcanza con que el `catch` no
+  esté vacío — un `catch (IOException) { continue; }` sin loguear nada es
+  tan silencioso como uno vacío para quien mira el resultado final. Esta regla
+  salió de tres bugs reales (fase 5, hito 2): `LocalStorageBackend.ListAsync` y
+  `FtpStorageBackend.ListAsync` devolvían cero archivos sin ningún indicio de
+  por qué, y un `Run` sin nada para copiar se veía idéntico a uno exitoso — los
+  tres eran `catch` con intención legítima (saltear una carpeta bloqueada, un
+  archivo que desapareció a mitad de escaneo) pero sin dejar ninguna marca,
+  así que un fallo real era indistinguible de "no había nada que hacer". Antes
+  de escribir un `catch` que no relanza, preguntate: si esto pasa en la
+  computadora de un usuario, ¿hay algo que le permita a él —o a quien lea el
+  log— darse cuenta?
 - Excepciones propias heredando de `JMBackupException` en `Domain/Exceptions`.
 - Configuración con `IOptions<T>` validado al arranque (`ValidateOnStart`).
 - Logging estructurado de Serilog con plantillas de mensaje, no interpolación:

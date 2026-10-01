@@ -25,6 +25,12 @@ namespace JMBackup.Storage.Tests.Remote;
 /// corriendo, Testcontainers no falla rápido al intentar levantar el contenedor — se
 /// queda esperando indefinidamente, colgando toda la corrida en vez de solo esta
 /// clase. Correr explícitamente con "dotnet test --filter Category=Docker".
+///
+/// ⚠️ DEUDA PENDIENTE (ver README): esta clase no corrió contra un contenedor real
+/// desde los commits 448f741/cad154b (verificación de permisos en
+/// TestConnectionAsync, ListAsync ya no traga fallos de listado en silencio) — la
+/// máquina de desarrollo no tenía soporte de virtualización. Ningún cambio nuevo a
+/// FtpStorageBackend se da por terminado sin correr esta suite primero.
 /// </summary>
 [Trait("Category", "Docker")]
 public sealed class FtpStorageBackendTests : IAsyncLifetime

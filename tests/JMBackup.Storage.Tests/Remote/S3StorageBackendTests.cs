@@ -18,6 +18,12 @@ namespace JMBackup.Storage.Tests.Remote;
 ///
 /// Etiquetada "Docker" y excluida del "dotnet test" normal (ver README). Correr
 /// explícitamente con "dotnet test --filter Category=Docker".
+///
+/// ⚠️ DEUDA PENDIENTE (ver README): esta clase no corrió contra un contenedor real
+/// desde los commits 448f741/cad154b (verificación de permisos en
+/// TestConnectionAsync) — la máquina de desarrollo no tenía soporte de
+/// virtualización. Ningún cambio nuevo a S3StorageBackend se da por terminado sin
+/// correr esta suite primero.
 /// </summary>
 [Trait("Category", "Docker")]
 public sealed class S3StorageBackendTests : IAsyncLifetime
